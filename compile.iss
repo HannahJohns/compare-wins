@@ -22,7 +22,7 @@ DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
 ; Remove the following line to run in administrative install mode (install for all users.)
 PrivilegesRequired=lowest
-OutputDir=D:\repositories\StrokeTournamentMethodsApp\releases
+OutputDir=D:\repositories\clinician-gpc\releases
 OutputBaseFilename=TMCalc_setup
 Compression=lzma
 SolidCompression=yes
@@ -35,8 +35,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "D:\repositories\StrokeTournamentMethodsApp\source\{#MyAppExeName}"; DestDir: "{app}"; Excludes: ".git*,.Rproj*,*.Rhistory,tests\*"; Flags: ignoreversion
-Source: "D:\repositories\StrokeTournamentMethodsApp\source\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "D:\repositories\clinician-gpc\source\{#MyAppExeName}"; DestDir: "{app}"; Excludes: ".git*,.Rproj*,*.Rhistory,tests\*"; Flags: ignoreversion
+Source: "D:\repositories\clinician-gpc\source\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
