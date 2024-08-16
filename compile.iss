@@ -23,7 +23,7 @@ DisableProgramGroupPage=yes
 ; Remove the following line to run in administrative install mode (install for all users.)
 PrivilegesRequired=lowest
 OutputDir=D:\repositories\clinician-gpc\releases
-OutputBaseFilename=TMCalc_setup
+OutputBaseFilename=ClinicianGPC_setup
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
