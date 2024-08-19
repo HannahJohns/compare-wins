@@ -12,7 +12,6 @@
 # WRestimates
 # EventWinRatios
 
-
 list(
   module_name = "DATAANALYSIS",
   module_label = "Data Analysis",
@@ -22,6 +21,11 @@ list(
             ),
   ui_element = sidebarLayout(
     sidebarPanel(
+      tags$script("$(document).on('click', '.DATAANALYSIS__ui_updater', function () {
+                              Shiny.onInputChange('DATAANALYSIS__uiUpdateId',this.id);
+                              Shiny.onInputChange('DATAANALYSIS__uiUpdateId_update',Math.random());
+                             });"),
+      
       uiOutput("DATAANALYSIS__ui_options")
       # fluidRow(
       #   actionButton("DATAANALYSIS__save_button","DEV_ONLY: Save state for interactive testing")
@@ -83,11 +87,17 @@ list(
         Z_t_trt <-Z_t_con
       }
       
+      levels <- isolate(input$DATAANALYSIS__arm_active_selectInput)
+      levels <- c(
+       levels,
+        setdiff(levels(formatted_data$arm),levels)
+      )
+        
       
       out <- WINS::win.stat(data = formatted_data,
                      ep_type = ep_type,
                      priority = 1:length(outcomes),
-                     arm.name = levels(formatted_data$arm),
+                     arm.name = levels,
                      tau = tau,
                      np_direction = np_direction,
                      Z_t_trt = Z_t_trt,
@@ -148,13 +158,191 @@ list(
                      choices=c("Win Ratio Analysis")), #"Probabilistic Index Model Analysis"
         # All of this should be nested inside conditional panels
         fluidRow(selectInput(inputId = "DATAANALYSIS__arm",
-                             label = "Treatment Arm is:",
+                             label = "Intervention variable is:",
                              choices = colnames(data_sheet)
         )),
-        # fluidRow("Option for selecting the active group goes here"),
-        # fluidRow("Options for covariates goes here. Needs to be made clear that WINS just uses this for ipcw stuff"),
+        fluidRow(
+          uiOutput("DATAANALYSIS__arm_active") # TODO: probably swap this out with something in data import module for formatting stuff
+        ),
+        fluidRow(
+          uiOutput(
+            "DATAANALYSIS__covariates_components"            
+          )
+        ),
         fluidRow(actionButton("DATAANALYSIS__analysis_go","Analyse!"))
       )
+      
+    })
+    
+    output$DATAANALYSIS__arm_active <- renderUI({
+      req(SYMBOLIC_LINK__data_sheet())
+      
+      data_sheet <- SYMBOLIC_LINK__data_sheet()
+      
+      
+      levels <- levels(as.factor(data_sheet[,input$DATAANALYSIS__arm]))
+      
+      selectInput(inputId = "DATAANALYSIS__arm_active_selectInput",
+                  label = "Intervention group is:",
+                  choices = levels
+      )
+      
+    })
+    
+    
+    # TODO: This will be the same architecture as the heirarchical stuff, we can
+    # copy the same code structure.
+    
+    # Observer for forcing a UI update 
+    DATAANALYSIS__force_UI_update <- reactiveVal(0)
+    
+    DATAANALYSIS__covariates <- reactiveVal(list())
+    
+    # If an action was taken that causes structural change to 
+    # Preference list (i.e. added/removed/re-ordered details)
+    # Make these changes as neccesary 
+    observe({
+      
+      req(SYMBOLIC_LINK__data_sheet())
+      data_sheet <- SYMBOLIC_LINK__data_sheet()
+      
+      input$DATAANALYSIS__uiUpdateId
+      
+      print(input$DATAANALYSIS__uiUpdateId)
+      
+      if (!is.null(input$DATAIMPORT__uiUpdateId)) {
+        
+        # Get preference list to modify
+        covariates_tmp <- isolate(DATAANALYSIS__covariates())
+        
+        selectedId <- isolate(input$DATAIMPORT__uiUpdateId)
+        
+        #Update preference list structure (e.g. shuffle, delete, etc) and then signal to update UI elements
+        
+        if(selectedId == "DATAANALYSIS__add_covariate"){
+          
+          # Add new preference component
+          covariates_tmp[[length(covariates_tmp)+1]] <- list(
+            var=colnames(data_sheet)[1]
+          )
+          DATAANALYSIS__covariates(covariates_tmp)
+          
+        } else {
+          
+          # Pressed button is in the dynamic rows.
+          # Action taken depends on the button type
+          
+          # actIdLabels <- c(
+          #   up="PREFDEF__component_up_",
+          #   down="PREFDEF__component_down_",
+          #   delete="PREFDEF__component_delete_"
+          # )    
+          # 
+          # actType <- which(sapply(actIdLabels,grepl,x=selectedId))
+          # actType <- names(actIdLabels)[actType]
+          # if(length(actType)!=1){
+          #   stop("Something is wrong")
+          # }
+          # 
+          # change_number <- as.numeric(gsub(actIdLabels[actType],"",selectedId))
+          # 
+          # if(is.na(change_number)) stop("unexpeced non-numeric value")
+          # 
+          # #TODO: Write this
+          # 
+          # if(actType == "up" & change_number > 1){
+          #   new_order <- 1:length(preferenceList_tmp)
+          #   
+          #   new_order[change_number] <- change_number-1
+          #   new_order[change_number-1] <- change_number
+          #   
+          #   preferenceList_tmp <- preferenceList_tmp[new_order]
+          # } else if (actType == "down" & change_number < length(preferenceList_tmp)){
+          #   new_order <- 1:length(preferenceList_tmp)
+          #   
+          #   new_order[change_number] <- change_number+1
+          #   new_order[change_number+1] <- change_number
+          #   
+          #   preferenceList_tmp <- preferenceList_tmp[new_order]
+          #   
+          # } else if(actType == "delete"){
+          #   preferenceList_tmp <- preferenceList_tmp[-change_number]
+          # }
+          # 
+          # # redundant
+          # # class(preferenceList_tmp) <- c("list","heirarchical")
+          # 
+          # PREFDEF__preferenceHeirarchy(preferenceList_tmp)
+          
+        }
+        
+        # # Signal to UI to update
+        tmp <- isolate(DATAANALYSIS__force_UI_update())
+        tmp <- tmp+1
+        tmp <- tmp %% 2
+        DATAANALYSIS__force_UI_update(tmp)
+        
+      }
+    })
+    
+    
+    output$DATAANALYSIS__covariates_components <- renderUI({
+      
+      req(SYMBOLIC_LINK__data_sheet())
+      
+      # Trigger update of this section only when signaled to do so.
+      # There is probably a better way to do this, but it works
+      DATAANALYSIS__force_UI_update()
+      
+      data_sheet <- isolate(SYMBOLIC_LINK__data_sheet())
+      
+      new_covariates <- isolate(DATAANALYSIS__covariates())
+      
+      add_covariate_button <-  fluidRow(
+        actionButton("DATAANALYSIS__add_covariate",
+                     "Add Covariate",
+                     class="DATAANALYSIS__ui_updater")
+        )  
+        
+        if(length(new_covariates)==0){
+          out <- tagList(add_covariate_button)
+        } else {
+
+          out <- tagList(
+            do.call("tagList", lapply(1:length(new_covariates), function(i){
+              fluidRow(
+                flowLayout(
+                  div(class="DATAANALYSIS__preference_value",
+                      selectInput(inputId = sprintf("DATAANALYSIS__component_var_%d",i),
+                                  label = "Outcome variable is:",
+                                  choices = colnames(data_sheet),
+                                  selected=new_preferences[[i]][["var"]]
+
+                      )),
+                  div(
+                    actionButton(inputId = sprintf("DATAANALYSIS__component_up_%d",i),
+                                 label = "Up",
+                                 class="DATAANALYSIS__ui_updater"
+                    ),
+                    actionButton(inputId = sprintf("DATAANALYSIS__component_down_%d",i),
+                                 label = "Down",
+                                 class="DATAANALYSIS__ui_updater"
+                    ),
+                    actionButton(inputId = sprintf("DATAANALYSIS__component_delete_%d",i),
+                                 label = "Delete",
+                                 class="DATAANALYSIS__ui_updater"
+                    )
+                  )
+                ),
+                tags$br(),
+                hr()
+              )
+            })),
+            fluidRow(add_covariate_button)
+          )
+      }
+      
+      out
       
     })
     
