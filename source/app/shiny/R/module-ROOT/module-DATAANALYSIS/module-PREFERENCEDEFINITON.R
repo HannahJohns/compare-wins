@@ -123,8 +123,6 @@ list(
           
           if(is.na(change_number)) stop("unexpeced non-numeric value")
           
-          #TODO: Write this
-          
           if(actType == "up" & change_number > 1){
             new_order <- 1:length(preferenceList_tmp)
             
@@ -143,9 +141,6 @@ list(
           } else if(actType == "delete"){
             preferenceList_tmp <- preferenceList_tmp[-change_number]
           }
-          
-          # redundant
-          # class(preferenceList_tmp) <- c("list","heirarchical")
           
           PREFDEF__preferenceHeirarchy(preferenceList_tmp)
           

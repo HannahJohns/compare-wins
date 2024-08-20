@@ -8,9 +8,18 @@
 
 # Win Ratio
 # WINS
-# WR
+# WR %>% 
 # WRestimates
 # EventWinRatios
+
+
+# This is a test of some code:
+# https://stackoverflow.com/questions/51621348/r-shiny-store-the-user-input-from-multiple-dynamically-generated-textareainput-f/51622007#51622007
+
+# TODO: need some way to select multiple components for this
+# Can use a wrapper function that obscures some of the nonsense here
+
+
 
 list(
   module_name = "DATAANALYSIS",
@@ -25,7 +34,6 @@ list(
                               Shiny.onInputChange('DATAANALYSIS__uiUpdateId',this.id);
                               Shiny.onInputChange('DATAANALYSIS__uiUpdateId_update',Math.random());
                              });"),
-      
       uiOutput("DATAANALYSIS__ui_options")
       # fluidRow(
       #   actionButton("DATAANALYSIS__save_button","DEV_ONLY: Save state for interactive testing")
@@ -36,6 +44,12 @@ list(
     )
   ),
   server_element = substitute({
+    
+    
+    # Convenience function for getting a list of reactive inputs
+    inputCollection <- function(input_names,input_index){
+        c(t(outer(input_names,input_index,paste0)))
+    }
     
     # Wrapper function for interfacing with WINS::win.stat
     
@@ -150,12 +164,11 @@ list(
       req(SYMBOLIC_LINK__data_sheet())
       data_sheet <- isolate(SYMBOLIC_LINK__data_sheet())
       
-      
       tagList(
         # Need a better way of describing these
         radioButtons("DATAANALYSIS__method",
                      label="Select analysis method:",
-                     choices=c("Win Ratio Analysis")), #"Probabilistic Index Model Analysis"
+                     choices=c("Win Ratio Analysis"="wins")), #"Probabilistic Index Model Analysis"
         # All of this should be nested inside conditional panels
         fluidRow(selectInput(inputId = "DATAANALYSIS__arm",
                              label = "Intervention variable is:",
@@ -164,11 +177,16 @@ list(
         fluidRow(
           uiOutput("DATAANALYSIS__arm_active") # TODO: probably swap this out with something in data import module for formatting stuff
         ),
+        fluidRow(tags$h4("Adjust for the following:")), # TODO
         fluidRow(
           uiOutput(
             "DATAANALYSIS__covariates_components"            
           )
         ),
+        # TODO: The following really should be uiOutput and 
+        # only shown if there's survival data in the preference
+        # heirarchy.
+        fluidRow(tags$h4("Censoring-related covariates")),
         fluidRow(actionButton("DATAANALYSIS__analysis_go","Analyse!"))
       )
       
@@ -190,32 +208,34 @@ list(
     })
     
     
-    # TODO: This will be the same architecture as the heirarchical stuff, we can
-    # copy the same code structure.
-    
-    # Observer for forcing a UI update 
-    DATAANALYSIS__force_UI_update <- reactiveVal(0)
+ 
     
     DATAANALYSIS__covariates <- reactiveVal(list())
     
     # If an action was taken that causes structural change to 
     # Preference list (i.e. added/removed/re-ordered details)
     # Make these changes as neccesary 
+    
+    # Observer for forcing a UI update
+    DATAANALYSIS__force_UI_update <- reactiveVal(0)
+    
     observe({
       
       req(SYMBOLIC_LINK__data_sheet())
       data_sheet <- SYMBOLIC_LINK__data_sheet()
       
-      input$DATAANALYSIS__uiUpdateId
+      input$DATAANALYSIS__uiUpdateId_update
       
       print(input$DATAANALYSIS__uiUpdateId)
       
-      if (!is.null(input$DATAIMPORT__uiUpdateId)) {
+      if (!is.null(input$DATAANALYSIS__uiUpdateId)) {
+        
+        currentMethod <- isolate(input$DATAANALYSIS__method)
         
         # Get preference list to modify
         covariates_tmp <- isolate(DATAANALYSIS__covariates())
         
-        selectedId <- isolate(input$DATAIMPORT__uiUpdateId)
+        selectedId <- isolate(input$DATAANALYSIS__uiUpdateId)
         
         #Update preference list structure (e.g. shuffle, delete, etc) and then signal to update UI elements
         
@@ -223,7 +243,9 @@ list(
           
           # Add new preference component
           covariates_tmp[[length(covariates_tmp)+1]] <- list(
-            var=colnames(data_sheet)[1]
+            var=colnames(data_sheet)[1],
+            stratify=ifelse(currentMethod=="wins",TRUE,FALSE), # Default depends on method being used
+            also_adjust=FALSE # used by PIM 
           )
           DATAANALYSIS__covariates(covariates_tmp)
           
@@ -232,50 +254,45 @@ list(
           # Pressed button is in the dynamic rows.
           # Action taken depends on the button type
           
-          # actIdLabels <- c(
-          #   up="PREFDEF__component_up_",
-          #   down="PREFDEF__component_down_",
-          #   delete="PREFDEF__component_delete_"
-          # )    
-          # 
-          # actType <- which(sapply(actIdLabels,grepl,x=selectedId))
-          # actType <- names(actIdLabels)[actType]
-          # if(length(actType)!=1){
-          #   stop("Something is wrong")
-          # }
-          # 
-          # change_number <- as.numeric(gsub(actIdLabels[actType],"",selectedId))
-          # 
-          # if(is.na(change_number)) stop("unexpeced non-numeric value")
-          # 
-          # #TODO: Write this
-          # 
-          # if(actType == "up" & change_number > 1){
-          #   new_order <- 1:length(preferenceList_tmp)
-          #   
-          #   new_order[change_number] <- change_number-1
-          #   new_order[change_number-1] <- change_number
-          #   
-          #   preferenceList_tmp <- preferenceList_tmp[new_order]
-          # } else if (actType == "down" & change_number < length(preferenceList_tmp)){
-          #   new_order <- 1:length(preferenceList_tmp)
-          #   
-          #   new_order[change_number] <- change_number+1
-          #   new_order[change_number+1] <- change_number
-          #   
-          #   preferenceList_tmp <- preferenceList_tmp[new_order]
-          #   
-          # } else if(actType == "delete"){
-          #   preferenceList_tmp <- preferenceList_tmp[-change_number]
-          # }
-          # 
-          # # redundant
-          # # class(preferenceList_tmp) <- c("list","heirarchical")
-          # 
-          # PREFDEF__preferenceHeirarchy(preferenceList_tmp)
+          actIdLabels <- c(
+            up="DATAANALYSIS__component_up_",
+            down="DATAANALYSIS__component_down_",
+            delete="DATAANALYSIS__component_delete_"
+          )
+          
+          actType <- which(sapply(actIdLabels,grepl,x=selectedId))
+          actType <- names(actIdLabels)[actType]
+          if(length(actType)!=1){
+            stop("module-ANALYSIS: Something is wrong")
+          }
+          
+          change_number <- as.numeric(gsub(actIdLabels[actType],"",selectedId))
+           
+          if(is.na(change_number)) stop("unexpeced non-numeric value")
+ 
+          if(actType == "up" & change_number > 1){
+            new_order <- 1:length(covariates_tmp)
+
+            new_order[change_number] <- change_number-1
+            new_order[change_number-1] <- change_number
+
+            covariates_tmp <- covariates_tmp[new_order]
+          } else if (actType == "down" & change_number < length(covariates_tmp)){
+            new_order <- 1:length(covariates_tmp)
+
+            new_order[change_number] <- change_number+1
+            new_order[change_number+1] <- change_number
+
+            covariates_tmp <- covariates_tmp[new_order]
+
+          } else if(actType == "delete"){
+            covariates_tmp <- covariates_tmp[-change_number]
+          }
+          
+          DATAANALYSIS__covariates(covariates_tmp)
           
         }
-        
+
         # # Signal to UI to update
         tmp <- isolate(DATAANALYSIS__force_UI_update())
         tmp <- tmp+1
@@ -283,6 +300,112 @@ list(
         DATAANALYSIS__force_UI_update(tmp)
         
       }
+    })
+    
+    
+    # Observer for changing DATAANALYSIS__covariates in response to UI input
+    # This doesn't require the same janky JS script hooks as there's not really
+    # any need to track what the last button press was
+    observeEvent(
+      lapply(
+        inputCollection(
+          c("DATAANALYSIS__component_var_",
+            "DATAANALYSIS__component_stratify_"),
+          1:length(isolate(DATAANALYSIS__covariates()))
+        ),
+        function(x) input[[x]]
+      ),{
+
+          # This is much cleaner than using JS tags, my god.
+          # rewrite interactive bits for this module using this and then we can port
+          # back over to preferencedefinition.
+
+          # Get a list of all relevant components
+          inputNames <- inputCollection(c("DATAANALYSIS__component_var_",
+                                          "DATAANALYSIS__component_stratify_"),
+                                        1:length(isolate(DATAANALYSIS__covariates())))
+
+          
+      
+          obj <- lapply(inputNames,function(x){input[[x]]})
+          names(obj) <- inputNames
+          
+          # Update the covariates list based on current inputs
+
+          covariates_tmp <- isolate(DATAANALYSIS__covariates())
+          
+          if(length(covariates_tmp)>0){
+            
+            lapply(inputNames, function(i){
+              
+              # Extract out what the name "i" corresponds to
+              varIdLabels <- c(
+                var="DATAANALYSIS__component_var_",
+                stratify="DATAANALYSIS__component_stratify_"
+              )
+              
+              changeType <- which(sapply(varIdLabels,grepl,x=i))
+              changeType <- names(varIdLabels)[changeType]
+              if(length(changeType)!=1){
+                stop("Something is wrong")
+              }
+              
+              change_number <- as.numeric(gsub(varIdLabels[changeType],"",i))
+              
+              # Violating scope is not ideal but it works
+              covariates_tmp[[change_number]][[changeType]] <<- obj[[i]]
+              
+              NULL
+            })
+            
+            print(covariates_tmp)
+            DATAANALYSIS__covariates(covariates_tmp)
+            
+          }
+         
+
+
+    })
+    
+    
+    
+    observe({
+      
+     #input$DATAANALYSIS_covariateId
+      input$DATAANALYSIS_covariateId_update
+      
+      print(input$DATAANALYSIS_covariateId)
+      
+      
+      if (!is.null(input$DATAANALYSIS_covariateId)) {
+        
+        changed_id <- isolate(input$DATAANALYSIS_covariateId)
+        changed_value <- isolate(input[[changed_id]])
+         
+      # Parse out the type of change
+        varIdLabels <- c(
+          var="DATAANALYSIS__component_var_",
+          stratify="DATAANALYSIS__component_stratify_"
+        )
+      
+      changeType <- which(sapply(varIdLabels,grepl,x=changed_id))
+      changeType <- names(varIdLabels)[changeType]
+      if(length(changeType)!=1){
+           stop("Something is wrong")
+      }
+
+      change_number <- as.numeric(gsub(varIdLabels[changeType],"",changed_id))
+
+      if(is.na(change_number)) stop("unexpeced non-numeric value")
+         
+      # This should be superceded if everything is working
+      # covariates_tmp <- isolate(DATAANALYSIS__covariates())
+      # covariates_tmp[[change_number]][[changeType]] <- changed_value
+      # print(covariates_tmp)
+      # DATAANALYSIS__covariates(covariates_tmp)
+      
+      }
+      
     })
     
     
@@ -294,6 +417,10 @@ list(
       # There is probably a better way to do this, but it works
       DATAANALYSIS__force_UI_update()
       
+      
+      currentMethod <- isolate(input$DATAANALYSIS__method)
+      
+        
       data_sheet <- isolate(SYMBOLIC_LINK__data_sheet())
       
       new_covariates <- isolate(DATAANALYSIS__covariates())
@@ -310,15 +437,39 @@ list(
 
           out <- tagList(
             do.call("tagList", lapply(1:length(new_covariates), function(i){
+              
+              # Default values for this covariate are taken from whatever the currently
+              # stored values are.
+              
+              
+              # THERE'S A BUG IN THIS CURRENTLY:
+              
+              # Warning: Error in &&: invalid 'y' type in 'x && y'
+              # It appears to be caused by incorrect typing, we're getting it as a string.
+              
+              # This may be a downstream bug from earlier handling of how we get the covariate list,
+              # we'll chase it down from there.
+              
+              
+              thisRow <- new_covariates[[i]]
+              print(thisRow)
+              if(is.null(thisRow)) return(NULL)
+              
               fluidRow(
                 flowLayout(
-                  div(class="DATAANALYSIS__preference_value",
+                  div(class="DATAANALYSIS_covariate_value",
                       selectInput(inputId = sprintf("DATAANALYSIS__component_var_%d",i),
-                                  label = "Outcome variable is:",
+                                  label = "",
                                   choices = colnames(data_sheet),
-                                  selected=new_preferences[[i]][["var"]]
+                                  selected=thisRow[["var"]]
 
-                      )),
+                  )),
+                  div(class="DATAANALYSIS_covariate_value",
+                      checkboxInput(inputId = sprintf("DATAANALYSIS__component_stratify_%d",i),
+                                    label = "Stratify?",
+                                    value=thisRow[["stratify"]] #ifelse(currentMethod=="wins",TRUE,FALSE) # TODO: THIS SHOULD GRAB FROM THE COVARIATE LIST
+                                  
+                  )),
                   div(
                     actionButton(inputId = sprintf("DATAANALYSIS__component_up_%d",i),
                                  label = "Up",
