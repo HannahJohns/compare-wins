@@ -1,5 +1,6 @@
 
 library(shiny)
+library(shinyBS)
 library(DT)
 
 source("R/constructor_functions.R")
@@ -17,5 +18,5 @@ ui <- fluidPage(
   do.call("tabsetPanel",construct_tabset_ui("R/module-ROOT")),
   
   fluidRow(hr()),
-fluidRow("Version 0.0.1.9001")
+  fluidRow("Version 0.0.1.9002")
 )

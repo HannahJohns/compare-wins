@@ -63,9 +63,6 @@ list(
       )
     )
     
-    
-    
-                                           
     # If an action was taken that causes structural change to 
     # Preference list (i.e. added/removed/re-ordered details)
     # Make these changes as neccesary 
@@ -229,7 +226,6 @@ list(
                                    label = "Outcome variable is:",
                                    choices = colnames(data_sheet),
                                    selected=new_preferences[[i]][["var"]]
-                                   
                        )),
                        # Conditional Panel for specifying second variable
                        conditionalPanel(sprintf("input.PREFDEF__component_type_%d=='surv'",i),
