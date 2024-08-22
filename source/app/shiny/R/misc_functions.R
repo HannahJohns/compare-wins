@@ -2,17 +2,46 @@
 # TODO: This is not a scalable way of having external functions for modules but
 # it will work for now
 
-# Wrapper function for interfacing with WINS::win.stat
+################################################################################
+# source("R/generate_data.R")
+# df$age_strt <- ifelse(df$age < median(df$age),0,1)
+# 
+# my_outcomes <- list(
+#   list(var="deathTime",indicator="deathStatus",type="surv",direction=">"),
+#   list(var="hospTime",indicator="hospStatus",type="surv",direction=">"),
+#   list(var="rankin",type="numeric",direction="<")
+# )
+# 
+# 
+# 
+# x <- wins_wrapper(df,outcomes = my_outcomes,
+#              arm = "trt",
+#              stratum = "age_strt",
+#              covariates = "age",
+#              levels = 1:0,
+#              method = "unadjusted",
+#              stratum.weight = "MH-type",
+#              pvalue = "two-sided"
+#              )
 
-# We can probably move this to an external R file rather than have it sit within the server definition
-wins_wrapper <- function(data, outcomes, arm,
+
+
+# Wrapper function for interfacing with WINS::win.stat
+# Gives the following:
+# Estimate: Overall results. If unstratified, also gives us explicit win/loss/tie proportions
+# Decomposed Estimate: Decomposition of the preference heirarchy with results individually and cumulative.
+                       # Only calculated if unstratified.
+# Estimates_by_stratum: Results by stratum including explicit win/loss/tie proportion and decomposition
+
+wins_wrapper <- function(data, outcomes, arm, levels,
                          stratum=NULL,
                          covariates=NULL,
                          method = "unadjusted",
-                         stratum.weight = "unstratified",
-                         pvalue = "two-sided"
+                         stratum.weight = "MH-type",
+                         pvalue = "two-sided",
+                         decompose = TRUE 
 ){
-  
+
   # First, we need to convert the data sheet into the correct format
   
   formatted_data <- data.frame(id=1:nrow(data))
@@ -60,12 +89,6 @@ wins_wrapper <- function(data, outcomes, arm,
     Z_t_trt <-Z_t_con
   }
   
-  levels <- isolate(input$DATAANALYSIS__arm_active_selectInput)
-  levels <- c(
-    levels,
-    setdiff(levels(formatted_data$arm),levels)
-  )
-  
   out <- WINS::win.stat(data = formatted_data,
                         ep_type = ep_type,
                         priority = 1:length(outcomes),
@@ -78,10 +101,8 @@ wins_wrapper <- function(data, outcomes, arm,
                         method = method,
                         stratum.weight = stratum.weight,
                         pvalue = pvalue,
-                        summary.print = FALSE 
+                        summary.print=FALSE
   )
-  
-  
   
   # Format results into a table to report back
   
@@ -91,34 +112,107 @@ wins_wrapper <- function(data, outcomes, arm,
     )
   }))
   
-  colnames(estimates)[-1] <- c("Estimate","Lower CI","Upper CI")
+  colnames(estimates)[-1] <- c("estimate","lower","upper")
   
-  estimates$p.value <- c(out$p_value)
+  estimates$p <- c(out$p_value)
+
+  # Win/loss/tie proportions only make sense to report if unstratified
+  if(length(stratum)==0){
+    estimates$win <- out$Win_prop$P_trt
+    estimates$loss <- out$Win_prop$P_con    
+    estimates$tie <- 1 - (out$Win_prop$P_trt + out$Win_prop$P_con)
+    
+  } else {
+    estimates$win <- NA
+    estimates$loss <- NA    
+    estimates$tie <- NA
+  }
   
-  # # Get endpoint wins/losses/ties/etc and format neatly for reporting as well
-  # 
-  # winTab <- out$summary_ep[
-  # names(out$summary_ep)[grepl("^Trt_",names(out$summary_ep))]
-  # ]
-  # winTab <- do.call("rbind",winTab)
-  # winTab$endpoint <- gsub("Trt_Endpoint","",rownames(winTab))
-  # winTab <- winTab[,c("Stratum","endpoint","Proportion")]
-  # colnames(winTab)[3] <- "Proportion_Win"
-  # 
-  # lossTab <- out$summary_ep[    
-  # names(out$summary_ep)[grepl("^Con_",names(out$summary_ep))]
-  # ]
-  # lossTab <- do.call("rbind",lossTab)
-  # lossTab$endpoint <- gsub("Con_Endpoint","",rownames(lossTab))
-  # lossTab <- lossTab[,c("Stratum","endpoint","Proportion")]
-  # colnames(lossTab)[3] <- "Proportion_Loss"
-  # 
-  # dplyr::left_join(winTab,lossTab)
+  # Recursively re-run to get results by stratum
   
-  estimates
+  # Get results by stratum
+  if(length(stratum)>0){
+    
+    estimates_by_stratum <- by(data = data,INDICES = formatted_data$stratum, function(tmpdf){
+      wins_wrapper(
+        tmpdf,
+        outcomes=outcomes,
+        arm=arm,
+        levels=levels,
+        stratum=NULL,
+        covariates=covariates,
+        method = method,
+        stratum.weight = "unstratified",
+        pvalue = pvalue,
+        decompose=decompose
+      )
+    })
+  } else {
+    estimates_by_stratum <- NULL
+  }
+  
+  # Get decomposition of results by outcome facets
+  if(length(outcomes)>1 & decompose){
+    
+    estimates_by_outcome <- lapply(1:length(outcomes),function(i){
+      
+      out <- wins_wrapper(data=data,
+                   outcomes=outcomes[i],
+                   arm=arm,
+                   levels=levels,
+                   stratum=stratum,
+                   covariates=covariates,
+                   method = method,
+                   stratum.weight = stratum.weight,
+                   pvalue = pvalue,
+                   decompose=FALSE
+      )
+      
+      out <- out$estimate
+      
+      colnames(out) <- paste(colnames(out))
+      
+      out <- cbind(level=i,out)
+      out
+      
+    })
+    
+    estimates_by_cumulative_outcome <- lapply(1:length(outcomes),function(i){
+      out <- wins_wrapper(data=data,
+                   outcomes=outcomes[1:i],
+                   arm=arm,
+                   levels=levels,
+                   stratum=stratum,
+                   covariates=covariates,
+                   method = method,
+                   stratum.weight = stratum.weight,
+                   pvalue = pvalue,
+                   decompose=FALSE
+      )
+      
+      out <- out$estimate
+      
+      
+      colnames(out)[-1] <- paste(colnames(out)[-1],"cumulative",sep="_")
+      out <- cbind(level=i,out)
+      out
+      
+    })
+    
+    decomposed_estimate <- left_join(
+      do.call("rbind",estimates_by_outcome),
+      do.call("rbind",estimates_by_cumulative_outcome)
+    ) %>% arrange(outcome,level)
+    
+  } else {
+    decomposed_estimate <- NULL
+  }
+  
+  list(
+    estimate = estimates %>% arrange(outcome),
+    decomposed_estimate = decomposed_estimate,
+    estimates_by_stratum = estimates_by_stratum
+  )
+  
 }
 
-
-
-
-  

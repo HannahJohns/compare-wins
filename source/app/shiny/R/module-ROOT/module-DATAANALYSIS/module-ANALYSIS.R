@@ -613,25 +613,25 @@ list(
     # Analysis Outputs ---------------------------------------------------------
    
     # Relies on functions found in misc_functions.R
-     
-    output$DATAANALYSIS__wins_output <- renderTable({
-      
-      
+    
+    # Store results of running analysis as a reactiveVal and then reference it
+    # To get specific results in the UI
+    
+    DATAANALYSIS__results <- reactiveVal(NULL)
+    
+    observeEvent(input$DATAANALYSIS__analysis_go,{
       req(SYMBOLIC_LINK__data_sheet())
       req(SYMBOLIC_LINK__preference_export())
-      
-      input$DATAANALYSIS__analysis_go
       
       data_sheet <- isolate(SYMBOLIC_LINK__data_sheet())
       preferences <- isolate(SYMBOLIC_LINK__preference_export())
       arm <- isolate(input$DATAANALYSIS__arm)
       
-      
       # Parse out covariate details
       
       stratum <- NULL
       covariates <- NULL
-     
+      
       print("Stratum are:")
       
       print(isolate(DATAANALYSIS__covariates()))
@@ -655,8 +655,7 @@ list(
       
       print(covariates)
       
-      
-      
+      out <- NULL
       if(!is.null(arm)){
         #TODO: At present, this only supports heirarchical output.
         # This needs fixed for use with e.g. PIM
@@ -665,23 +664,36 @@ list(
           
           #TODO: Add options for stratification, ipcw and covariate ipcw adjustment etc
           
+          levels <- isolate(input$DATAANALYSIS__arm_active_selectInput)
+          levels <- c(
+            levels,
+            setdiff(levels(as.factor(data_sheet[,arm])),levels)
+          )
+          
           out <- wins_wrapper(data = data_sheet,
                               outcomes=preferences$heirarchical,
                               arm=arm,
+                              levels=levels,
                               stratum = stratum,
+                              stratum.weight = "MH-type",
                               covariates = covariates,
                               method = "unadjusted"
+                              # pvalue = "two-sided",
+                              # alpha = 0.05
           )
-          
-          return(out)
-          
-        } else {
-          return(NULL)
+
+         
         }
-        
-      }
+    }
       
+      print(out)
+      DATAANALYSIS__results(out)
     })
+    
+    output$DATAANALYSIS__wins_output <- renderTable({
+      DATAANALYSIS__results()$estimate
+    })
+    
     
     observeEvent(input$DATAANALYSIS__save_button,{
       out <- list(
@@ -690,7 +702,6 @@ list(
       )
       saveRDS(out,file="tmp.RDS")
     })
-    
     
   })
 )
