@@ -626,16 +626,16 @@ list(
       data_sheet <- isolate(SYMBOLIC_LINK__data_sheet())
       preferences <- isolate(SYMBOLIC_LINK__preference_export())
       arm <- isolate(input$DATAANALYSIS__arm)
-      
+
       # Parse out covariate details
-      
+
       stratum <- NULL
       covariates <- NULL
-      
+
       print("Stratum are:")
-      
+
       print(isolate(DATAANALYSIS__covariates()))
-      
+
       stratum <- sapply(isolate(DATAANALYSIS__covariates()), function(x){
         if(x[["stratify"]]){
           return(x[["var"]])
@@ -643,49 +643,248 @@ list(
           return(NULL)
         }
       })
-      
+
       print(stratum)
-      
+
+
+      # Need to get a list of strata
+      if(length(stratum)>0){
+        if(length(stratum)==1){
+          n_strata <- length(unique(data_sheet[,stratum]))  
+        } else {
+          n_strata <- nrow(unique(data_sheet[,stratum]))          
+        }
+      } else {
+        n_strata <- 0
+      }
+
       print("Covariates are:")
-      
-      print(isolate(DATAANALYSIS__surv_covariates()))      
+
+      print(isolate(DATAANALYSIS__surv_covariates()))
       covariates <- sapply(isolate(DATAANALYSIS__surv_covariates()), function(x){
         return(x[["var"]])
       })
-      
+
       print(covariates)
-      
+
       out <- NULL
       if(!is.null(arm)){
         #TODO: At present, this only supports heirarchical output.
         # This needs fixed for use with e.g. PIM
-        
+
         if(isolate(input$SYMBOLIC_LINK__preferenceType)=="heirarchical"){
-          
-          #TODO: Add options for stratification, ipcw and covariate ipcw adjustment etc
-          
+
+          outcomes <- preferences$heirarchical
+
           levels <- isolate(input$DATAANALYSIS__arm_active_selectInput)
           levels <- c(
             levels,
             setdiff(levels(as.factor(data_sheet[,arm])),levels)
           )
-          
-          out <- wins_wrapper(data = data_sheet,
-                              outcomes=preferences$heirarchical,
-                              arm=arm,
-                              levels=levels,
-                              stratum = stratum,
-                              stratum.weight = "MH-type",
-                              covariates = covariates,
-                              method = "unadjusted"
-                              # pvalue = "two-sided",
-                              # alpha = 0.05
-          )
 
-         
-        }
-    }
+          # Set up out objects and get total runs for progress bar
       
+          total_run <- 1 # Main results
+      
+          if(length(outcomes)>1){
+            decomposed_estimate <- lapply(1:length(outcomes), function(i){NULL})
+      
+            total_run <- total_run + 2*length(outcomes) # Run once for individual and once for cumulative
+      
+          } else {
+            decomposed_estimate <- NULL
+          }
+      
+
+          if(n_strata>0){
+            if(length(outcomes)>1){
+
+              estimates_by_stratum <- lapply(1:n_strata, function(i){NULL})
+
+              total_run <- total_run + n_strata*(1+2*length(outcomes))
+
+            } else {
+
+              estimates_by_stratum <- lapply(1:n_strata, function(i){NULL})
+
+              total_run <- total_run + n_strata
+
+            }
+
+          } else {
+            estimates_by_stratum <- NULL
+          }
+          
+          withProgress(message = 'Analysing',detail = "Overall results", value = 0, {
+            
+            
+            
+            
+            estimate <- wins_wrapper(data = data_sheet,
+                                     outcomes=outcomes,
+                                     arm=arm,
+                                     levels=levels,
+                                     stratum = stratum,
+                                     stratum.weight = "MH-type",
+                                     covariates = covariates,
+                                     method = "unadjusted"
+                                     # pvalue = "two-sided",
+                                     # alpha = 0.05
+            )
+            
+            
+            # Get decomposition of results by outcome facets
+            if(length(outcomes)>1){
+              
+              for(i in 1:length(outcomes)){
+                
+                incProgress(1/total_run,detail = sprintf("Component %d..",i))
+                
+                estimate_by_outcome <- wins_wrapper(data = data_sheet,
+                                                    outcomes=outcomes[i],
+                                                    arm=arm,
+                                                    levels=levels,
+                                                    stratum = stratum,
+                                                    stratum.weight = "MH-type",
+                                                    covariates = covariates,
+                                                    method = "unadjusted"
+                                                    # pvalue = "two-sided",
+                                                    # alpha = 0.05
+                )
+                
+                colnames(estimate_by_outcome) <- paste(colnames(estimate_by_outcome))
+                estimate_by_outcome <- cbind(level=i,estimate_by_outcome)
+                
+                incProgress(1/total_run,detail = sprintf("Component %d...",i))
+                
+                estimate_by_cumulative_outcome <- wins_wrapper(data = data_sheet,
+                                                               outcomes=outcomes[i],
+                                                               arm=arm,
+                                                               levels=levels,
+                                                               stratum = stratum,
+                                                               stratum.weight = "MH-type",
+                                                               covariates = covariates,
+                                                               method = "unadjusted"
+                                                               # pvalue = "two-sided",
+                                                               # alpha = 0.05
+                )
+                
+                colnames(estimate_by_cumulative_outcome)[-1] <- paste(colnames(estimate_by_cumulative_outcome)[-1],"cumulative",sep="_")
+                estimate_by_cumulative_outcome <- cbind(level=i,estimate_by_cumulative_outcome)
+                
+                
+                decomposed_estimate[[i]] <- left_join(
+                  estimate_by_outcome,
+                  estimate_by_cumulative_outcome,
+                ) %>% arrange(outcome,level)
+                
+              }
+              
+              decomposed_estimate <- do.call("rbind",decomposed_estimate)
+            } # End if decompose at top level
+            
+            
+            if(n_strata>0){
+              
+              
+              if(length(stratum)==1){
+                strata_column <- data_sheet[,stratum]
+              } else {
+                strata_column <-apply(data_sheet[,stratum],1,paste)
+              }
+              
+              stratified_data_sheet <- by(data = data_sheet,
+                                          INDICES = strata_column,
+                                          function(x){x}
+              )
+              
+              for(j in 1:length(stratified_data_sheet)){
+                
+                incProgress(1/total_run,detail = sprintf("Strata %d",j))
+                
+                strata_estimate <-  wins_wrapper(data = stratified_data_sheet[[j]],
+                                                 outcomes=outcomes,
+                                                 arm=arm,
+                                                 levels=levels,
+                                                 stratum.weight = "unstratified",
+                                                 covariates = covariates,
+                                                 method = "unadjusted"
+                                                 # pvalue = "two-sided",
+                                                 # alpha = 0.05
+                )
+                
+                tmp_decomposed_estimate <- lapply(1:length(outcomes), function(i){NULL})
+                
+                if(length(outcomes)>1){
+                  for(i in 1:length(outcomes)){
+                    
+                    incProgress(1/total_run,detail = sprintf("Strata %d Component %d..",j,i))
+                    estimate_by_outcome <- wins_wrapper(data = data_sheet,
+                                                        outcomes=outcomes[i],
+                                                        arm=arm,
+                                                        levels=levels,
+                                                        stratum = stratum,
+                                                        stratum.weight = "unstratified",
+                                                        covariates = covariates,
+                                                        method = "unadjusted"
+                                                        # pvalue = "two-sided",
+                                                        # alpha = 0.05
+                    )
+                    
+                    colnames(estimate_by_outcome) <- paste(colnames(estimate_by_outcome))
+                    estimate_by_outcome <- cbind(level=i,estimate_by_outcome)
+                    
+                    incProgress(1/total_run,detail = sprintf("Strata %d Component %d...",j,i))
+                    estimate_by_cumulative_outcome <- wins_wrapper(data = data_sheet,
+                                                                   outcomes=outcomes[i],
+                                                                   arm=arm,
+                                                                   levels=levels,
+                                                                   stratum = stratum,
+                                                                   stratum.weight = "MH-type",
+                                                                   covariates = covariates,
+                                                                   method = "unadjusted"
+                                                                   # pvalue = "two-sided",
+                                                                   # alpha = 0.05
+                    )
+                    
+                    colnames(estimate_by_cumulative_outcome)[-1] <- paste(colnames(estimate_by_cumulative_outcome)[-1],"cumulative",sep="_")
+                    estimate_by_cumulative_outcome <- cbind(level=i,estimate_by_cumulative_outcome)
+                    
+                    # THE INDEX IS WRONG HERE!!!!!!
+                    
+                    tmp_decomposed_estimate[[i]] <- left_join(
+                      estimate_by_outcome,
+                      estimate_by_cumulative_outcome
+                    ) %>% arrange(outcome,level)
+                    
+                  }
+                  
+                  tmp_decomposed_estimate <- do.call("rbind",tmp_decomposed_estimate)
+                  
+                } else {
+                  tmp_decomposed_estimate <- NULL
+                }
+                
+                
+                
+                estimates_by_stratum[[j]] <- list(estimate=strata_estimate,
+                                                  decomposed_estimate=tmp_decomposed_estimate)
+                
+              } # End for strata
+              
+            } # End if strata
+            
+            
+            
+            
+          }) # End with progress
+         
+          
+          out <- list(estimate=estimate,decomposed_estimate=decomposed_estimate,estimates_by_stratum=estimates_by_stratum)
+          
+        } # End If Heirarchical
+      } # End if not null arm
+
       print(out)
       DATAANALYSIS__results(out)
     })

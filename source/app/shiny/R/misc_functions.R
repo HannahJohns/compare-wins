@@ -39,7 +39,7 @@ wins_wrapper <- function(data, outcomes, arm, levels,
                          method = "unadjusted",
                          stratum.weight = "MH-type",
                          pvalue = "two-sided",
-                         decompose = TRUE 
+                         decompose = TRUE
 ){
 
   # First, we need to convert the data sheet into the correct format
@@ -128,91 +128,7 @@ wins_wrapper <- function(data, outcomes, arm, levels,
     estimates$tie <- NA
   }
   
-  # Recursively re-run to get results by stratum
-  
-  # Get results by stratum
-  if(length(stratum)>0){
-    
-    estimates_by_stratum <- by(data = data,INDICES = formatted_data$stratum, function(tmpdf){
-      wins_wrapper(
-        tmpdf,
-        outcomes=outcomes,
-        arm=arm,
-        levels=levels,
-        stratum=NULL,
-        covariates=covariates,
-        method = method,
-        stratum.weight = "unstratified",
-        pvalue = pvalue,
-        decompose=decompose
-      )
-    })
-  } else {
-    estimates_by_stratum <- NULL
-  }
-  
-  # Get decomposition of results by outcome facets
-  if(length(outcomes)>1 & decompose){
-    
-    estimates_by_outcome <- lapply(1:length(outcomes),function(i){
-      
-      out <- wins_wrapper(data=data,
-                   outcomes=outcomes[i],
-                   arm=arm,
-                   levels=levels,
-                   stratum=stratum,
-                   covariates=covariates,
-                   method = method,
-                   stratum.weight = stratum.weight,
-                   pvalue = pvalue,
-                   decompose=FALSE
-      )
-      
-      out <- out$estimate
-      
-      colnames(out) <- paste(colnames(out))
-      
-      out <- cbind(level=i,out)
-      out
-      
-    })
-    
-    estimates_by_cumulative_outcome <- lapply(1:length(outcomes),function(i){
-      out <- wins_wrapper(data=data,
-                   outcomes=outcomes[1:i],
-                   arm=arm,
-                   levels=levels,
-                   stratum=stratum,
-                   covariates=covariates,
-                   method = method,
-                   stratum.weight = stratum.weight,
-                   pvalue = pvalue,
-                   decompose=FALSE
-      )
-      
-      out <- out$estimate
-      
-      
-      colnames(out)[-1] <- paste(colnames(out)[-1],"cumulative",sep="_")
-      out <- cbind(level=i,out)
-      out
-      
-    })
-    
-    decomposed_estimate <- left_join(
-      do.call("rbind",estimates_by_outcome),
-      do.call("rbind",estimates_by_cumulative_outcome)
-    ) %>% arrange(outcome,level)
-    
-  } else {
-    decomposed_estimate <- NULL
-  }
-  
-  list(
-    estimate = estimates %>% arrange(outcome),
-    decomposed_estimate = decomposed_estimate,
-    estimates_by_stratum = estimates_by_stratum
-  )
+  estimates
   
 }
 

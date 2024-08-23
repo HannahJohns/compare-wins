@@ -10,6 +10,7 @@ library(DT)
 
 
 library(rlang)
+library(tidyverse)
 # a <- substitute({x <- 1})
 # b <- substitute({x <- x+1})
 # 
