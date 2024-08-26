@@ -85,12 +85,15 @@ list(
           fluidPage(
             uiOutput(
               "DATAANALYSIS__covariates_components"            
+            ),
+            uiOutput(
+              "DATAANALYSIS__covariate_options"            
             )
           )
           )
         ),
         fluidRow(
-          bsCollapsePanel("Adjust for Covariate-Dependent Censoring",
+          bsCollapsePanel("Adjust for Censoring",
             fluidPage(
               # TODO: The following really should be uiOutput and 
               # only shown if there's survival data in the preference
@@ -99,6 +102,9 @@ list(
               # as NULL when not relevant
               uiOutput(
                 "DATAANALYSIS__surv_covariates_components"            
+              ),
+              uiOutput(
+                "DATAANALYSIS__surv_covariate_options"            
               )
             )
           )
@@ -121,6 +127,8 @@ list(
                   choices = levels
       )
       
+      
+      
     })
     
     ### Dynamic Analysis Options #################################################
@@ -139,7 +147,6 @@ list(
       # Trigger update of this section only when signaled to do so.
       # There is probably a better way to do this, but it works
       DATAANALYSIS__force_covar_UI_update()
-      
       
       currentMethod <- isolate(input$DATAANALYSIS__method)
       
@@ -368,6 +375,27 @@ list(
       }
     })
     
+    output$DATAANALYSIS__covariate_options <- renderUI({
+      
+      out <- NULL
+
+      # Only display options if covariates have been added
+      covariates_tmp <- DATAANALYSIS__covariates()
+      
+      if(length(covariates_tmp)>0){
+       out <- selectInput("DATAANALYSIS__covariate_strata_method",
+                          label = "Stratification method",
+                          choices =  c("Maentel-Haenszel"="MH-type",
+                                       "Unstratified"="unstratified",
+                                       "Proportional"="wt.stratum1",
+                                       "Proportional (observed events)"="wt.stratum2",
+                                       "Equal Weights"="equal")
+                          )
+       }
+            
+      out
+      
+    })
     
     
     # Survival Covariate Control ---------------------------------------------------------
@@ -609,6 +637,32 @@ list(
       })
     
     
+    output$DATAANALYSIS__surv_covariate_options <- renderUI({
+      
+      out <- NULL
+      
+      # Only display options if covariates have been added
+      covariates_tmp <- DATAANALYSIS__surv_covariates()
+      
+      if(length(covariates_tmp)>0){
+       choices <- c("Unadjusted"="unadjusted",
+                    "IPCW"="ipcw",
+                    "IPCW (Covariate Dependent)"="covipcw"
+                    )
+      } else {
+        choices <- c("Unadjusted"="unadjusted",
+                     "IPCW"="ipcw"
+        )
+      }
+      
+      out <- selectInput("DATAANALYSIS__surv_covariate_strata_method",
+                         label = "Stratification method",
+                         choices =  choices
+      )
+      
+      out
+    })
+    
     
     # Analysis Outputs ---------------------------------------------------------
    
@@ -715,28 +769,61 @@ list(
             estimates_by_stratum <- NULL
           }
           
+          
+          if(is.null(isolate(input$DATAANALYSIS__covariate_strata_method))){
+            stratum.weight <- "unstratified"
+          } else {
+            stratum.weight <- isolate(input$DATAANALYSIS__covariate_strata_method)
+          }
+          
+          if(is.null(isolate(input$DATAANALYSIS__surv_covariate_strata_method))){
+            adjust.method <- "unadjusted"
+          } else {
+            adjust.method <- isolate(input$DATAANALYSIS__surv_covariate_strata_method)
+          }
+          
           withProgress(message = 'Analysing',detail = "Overall results", value = 0, {
             
             
+            # 
+            # # This needs deleted before pull request to merge with main
+            # trace <- list(data = data_sheet,
+            #              outcomes=outcomes,
+            #              arm=arm,
+            #              levels=levels,
+            #              stratum = stratum,
+            #              stratum.weight = stratum.weight,
+            #              covariates = covariates,
+            #              method = adjust.method,
+            #              pvalue = "two-sided"
+            #              # alpha = 0.05
+            # )
+            # saveRDS(trace,file="DEBUG_TRACE_INPUTS.RDS")
             
             
+            write(sprintf("Running win.stat"), stderr())
+
             estimate <- wins_wrapper(data = data_sheet,
                                      outcomes=outcomes,
                                      arm=arm,
                                      levels=levels,
                                      stratum = stratum,
-                                     stratum.weight = "MH-type",
+                                     stratum.weight = stratum.weight,
                                      covariates = covariates,
-                                     method = "unadjusted"
-                                     # pvalue = "two-sided",
+                                     method = adjust.method,
+                                     pvalue = "two-sided"
                                      # alpha = 0.05
             )
             
+            write(sprintf("Done"), stderr())
             
             # Get decomposition of results by outcome facets
             if(length(outcomes)>1){
-              
+            
+              write(sprintf("Decomposing outcomes by facets"), stderr())  
               for(i in 1:length(outcomes)){
+                
+                write(sprintf("Facet %d",i), stderr())  
                 
                 incProgress(1/total_run,detail = sprintf("Component %d..",i))
                 
@@ -755,6 +842,9 @@ list(
                 colnames(estimate_by_outcome) <- paste(colnames(estimate_by_outcome))
                 estimate_by_outcome <- cbind(level=i,estimate_by_outcome)
                 
+                write(sprintf("Done"), stderr())  
+                write(sprintf("Facets 1 to %d",i), stderr())  
+                
                 incProgress(1/total_run,detail = sprintf("Component %d...",i))
                 
                 estimate_by_cumulative_outcome <- wins_wrapper(data = data_sheet,
@@ -772,6 +862,8 @@ list(
                 colnames(estimate_by_cumulative_outcome)[-1] <- paste(colnames(estimate_by_cumulative_outcome)[-1],"cumulative",sep="_")
                 estimate_by_cumulative_outcome <- cbind(level=i,estimate_by_cumulative_outcome)
                 
+                write(sprintf("Done"), stderr())  
+                write(sprintf("Facets 1 to %d",i), stderr())  
                 
                 decomposed_estimate[[i]] <- left_join(
                   estimate_by_outcome,
@@ -874,15 +966,17 @@ list(
               
             } # End if strata
             
-            
-            
-            
           }) # End with progress
          
           
           out <- list(estimate=estimate,decomposed_estimate=decomposed_estimate,estimates_by_stratum=estimates_by_stratum)
           
-        } # End If Heirarchical
+        } # End If Hierarchical
+        
+        
+        
+        
+        
       } # End if not null arm
 
       print(out)
