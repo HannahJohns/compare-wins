@@ -60,3 +60,4 @@ scratchSpace.R
 # Compiled files
 releases/
 *.RDS
+source/log.txt

@@ -72,10 +72,11 @@ list(
           uiOutput("DATAANALYSIS__arm_active") # TODO: probably swap this out with something in data import module for formatting stuff
         ),
         fluidRow(
-          bsCollapsePanel("Statistical controls (e.g. α)",
+          bsCollapsePanel("Statistical controls",
                           fluidPage(
                             fluidRow(
-                              "TODO: OPTIONS GO HERE "            
+                              numericInput("DATAANALYSIS__alpha",label = "Type-I error (α)",
+                                           value = 0.05,min = 0,max = 1,step = 0.01)
                             )
                           )
           )
@@ -149,7 +150,6 @@ list(
       DATAANALYSIS__force_covar_UI_update()
       
       currentMethod <- isolate(input$DATAANALYSIS__method)
-      
       
       data_sheet <- isolate(SYMBOLIC_LINK__data_sheet())
       
@@ -725,6 +725,9 @@ list(
       if(!is.null(arm)){
         #TODO: At present, this only supports heirarchical output.
         # This needs fixed for use with e.g. PIM
+        
+        
+        alpha <- isolate(input$DATAANALYSIS__alpha)
 
         if(isolate(input$SYMBOLIC_LINK__preferenceType)=="heirarchical"){
 
@@ -784,23 +787,6 @@ list(
           
           withProgress(message = 'Analysing',detail = "Overall results", value = 0, {
             
-            
-            # 
-            # # This needs deleted before pull request to merge with main
-            # trace <- list(data = data_sheet,
-            #              outcomes=outcomes,
-            #              arm=arm,
-            #              levels=levels,
-            #              stratum = stratum,
-            #              stratum.weight = stratum.weight,
-            #              covariates = covariates,
-            #              method = adjust.method,
-            #              pvalue = "two-sided"
-            #              # alpha = 0.05
-            # )
-            # saveRDS(trace,file="DEBUG_TRACE_INPUTS.RDS")
-            
-            
             write(sprintf("Running win.stat"), stderr())
 
             estimate <- wins_wrapper(data = data_sheet,
@@ -811,8 +797,7 @@ list(
                                      stratum.weight = stratum.weight,
                                      covariates = covariates,
                                      method = adjust.method,
-                                     pvalue = "two-sided"
-                                     # alpha = 0.05
+                                     alpha = alpha
             )
             
             write(sprintf("Done"), stderr())
@@ -832,11 +817,10 @@ list(
                                                     arm=arm,
                                                     levels=levels,
                                                     stratum = stratum,
-                                                    stratum.weight = "MH-type",
+                                                    stratum.weight = stratum.weight,
                                                     covariates = covariates,
-                                                    method = "unadjusted"
-                                                    # pvalue = "two-sided",
-                                                    # alpha = 0.05
+                                                    method = adjust.method,
+                                                    alpha = alpha
                 )
                 
                 colnames(estimate_by_outcome) <- paste(colnames(estimate_by_outcome))
@@ -852,11 +836,10 @@ list(
                                                                arm=arm,
                                                                levels=levels,
                                                                stratum = stratum,
-                                                               stratum.weight = "MH-type",
+                                                               stratum.weight = stratum.weight,
                                                                covariates = covariates,
-                                                               method = "unadjusted"
-                                                               # pvalue = "two-sided",
-                                                               # alpha = 0.05
+                                                               method = adjust.method,
+                                                               alpha = alpha
                 )
                 
                 colnames(estimate_by_cumulative_outcome)[-1] <- paste(colnames(estimate_by_cumulative_outcome)[-1],"cumulative",sep="_")
@@ -898,11 +881,10 @@ list(
                                                  outcomes=outcomes,
                                                  arm=arm,
                                                  levels=levels,
-                                                 stratum.weight = "unstratified",
+                                                 stratum.weight = stratum.weight,
                                                  covariates = covariates,
-                                                 method = "unadjusted"
-                                                 # pvalue = "two-sided",
-                                                 # alpha = 0.05
+                                                 method = adjust.method,
+                                                 alpha = alpha
                 )
                 
                 tmp_decomposed_estimate <- lapply(1:length(outcomes), function(i){NULL})
@@ -916,11 +898,10 @@ list(
                                                         arm=arm,
                                                         levels=levels,
                                                         stratum = stratum,
-                                                        stratum.weight = "unstratified",
+                                                        stratum.weight = stratum.weight,
                                                         covariates = covariates,
-                                                        method = "unadjusted"
-                                                        # pvalue = "two-sided",
-                                                        # alpha = 0.05
+                                                        method = adjust.method,
+                                                        alpha = alpha
                     )
                     
                     colnames(estimate_by_outcome) <- paste(colnames(estimate_by_outcome))
@@ -932,11 +913,10 @@ list(
                                                                    arm=arm,
                                                                    levels=levels,
                                                                    stratum = stratum,
-                                                                   stratum.weight = "MH-type",
+                                                                   stratum.weight = stratum.weight,
                                                                    covariates = covariates,
-                                                                   method = "unadjusted"
-                                                                   # pvalue = "two-sided",
-                                                                   # alpha = 0.05
+                                                                   method = adjust.method,
+                                                                   alpha = alpha
                     )
                     
                     colnames(estimate_by_cumulative_outcome)[-1] <- paste(colnames(estimate_by_cumulative_outcome)[-1],"cumulative",sep="_")

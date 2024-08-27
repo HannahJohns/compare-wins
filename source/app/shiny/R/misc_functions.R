@@ -39,8 +39,37 @@ wins_wrapper <- function(data, outcomes, arm, levels,
                          method = "unadjusted",
                          stratum.weight = "MH-type",
                          pvalue = "two-sided",
+                         alpha=0.05,
                          decompose = TRUE
 ){
+  # 
+  # print("ATTEMPTING TO RUN WINS_WRAPPER")
+  # # This needs deleted before pull request to merge with main
+  # trace <- list(data = data,
+  #              outcomes=outcomes,
+  #              arm=arm,
+  #              levels=levels,
+  #              stratum = stratum,
+  #              stratum.weight = stratum.weight,
+  #              covariates = covariates,
+  #              method = method,
+  #              pvalue = "two-sided"
+  #              # alpha = 0.05
+  # )
+  # saveRDS(trace,file="DEBUG_TRACE_INPUTS.RDS")
+  
+  # print(
+  #   list(outcomes=outcomes,
+  #        arm=arm,
+  #        levels=levels,
+  #        stratum = stratum,
+  #        stratum.weight = stratum.weight,
+  #        covariates = covariates,
+  #        method = method,
+  #        pvalue = "two-sided"
+  #        # alpha = 0.05
+  #   )
+  # )
 
   # First, we need to convert the data sheet into the correct format
   
@@ -53,10 +82,6 @@ wins_wrapper <- function(data, outcomes, arm, levels,
     } else {
       formatted_data$stratum <- do.call("paste", lapply(stratum, function(x){data[,x]}))   
     }
-    
-    #TODO: This should be user-input
-    stratum.weight <- "MH-type"
-    
   } else {
     stratum.weight <- "unstratified"
   }
@@ -82,12 +107,17 @@ wins_wrapper <- function(data, outcomes, arm, levels,
     Z_t_trt <- Z_t_con <- NULL
   } else {
     # At present only support covariates at baseline
-    Z_t_con <- data.frame(id=1:nrow(data), time=0) 
+    Z_t_con <- data.frame(id=1:nrow(formatted_data), time=0) 
     for(i in 1:length(covariates)){
       Z_t_con[,covariates[i]] <- data[,covariates[i]]
     }
     Z_t_trt <-Z_t_con
+    
+    # Z_t_trt/con must contain only controls and treatments respectively
+    Z_t_trt <- Z_t_trt[which(formatted_data$arm==levels[1]),]
+    Z_t_con <- Z_t_con[which(formatted_data$arm==levels[2]),]
   }
+  
   
   out <- WINS::win.stat(data = formatted_data,
                         ep_type = ep_type,
@@ -97,10 +127,10 @@ wins_wrapper <- function(data, outcomes, arm, levels,
                         np_direction = np_direction,
                         Z_t_trt = Z_t_trt,
                         Z_t_con = Z_t_con, 
-                        alpha = 0.05,
                         method = method,
                         stratum.weight = stratum.weight,
                         pvalue = pvalue,
+                        alpha=alpha,
                         summary.print=FALSE
   )
   
