@@ -42,7 +42,7 @@ wins_wrapper <- function(data, outcomes, arm, levels,
                          alpha=0.05,
                          decompose = TRUE
 ){
-  # 
+   
   # print("ATTEMPTING TO RUN WINS_WRAPPER")
   # # This needs deleted before pull request to merge with main
   # trace <- list(data = data,
@@ -71,6 +71,7 @@ wins_wrapper <- function(data, outcomes, arm, levels,
   #   )
   # )
 
+
   # First, we need to convert the data sheet into the correct format
   
   formatted_data <- data.frame(id=1:nrow(data))
@@ -88,9 +89,10 @@ wins_wrapper <- function(data, outcomes, arm, levels,
   
   ep_type <- {}
   np_direction <- {}
+  tau <- {}
   for(i in 1:length(outcomes)){
     ep_type[i] <- outcomes[[i]]$type
-    tau <- 0 # TODO: Need to add this
+    tau[i] <- outcomes[[i]]$tau
     np_direction[i] <- c(`>`="larger",`<`="smaller")[outcomes[[i]]$direction]
     
     formatted_data[,sprintf("Y_%d",i)] <- data[,outcomes[[i]]$var]
@@ -118,44 +120,70 @@ wins_wrapper <- function(data, outcomes, arm, levels,
     Z_t_con <- Z_t_con[which(formatted_data$arm==levels[2]),]
   }
   
-  
-  out <- WINS::win.stat(data = formatted_data,
-                        ep_type = ep_type,
-                        priority = 1:length(outcomes),
-                        arm.name = levels,
-                        tau = tau,
-                        np_direction = np_direction,
-                        Z_t_trt = Z_t_trt,
-                        Z_t_con = Z_t_con, 
-                        method = method,
-                        stratum.weight = stratum.weight,
-                        pvalue = pvalue,
-                        alpha=alpha,
-                        summary.print=FALSE
-  )
-  
-  # Format results into a table to report back
-  
-  estimates <- do.call("rbind",lapply(names(out$Win_statistic),function(i){
-    cbind(outcome=i,
-          as.data.frame(matrix(out$Win_statistic[[i]],nrow=1))
+  didError <- tryCatch({
+    
+    out <- WINS::win.stat(data = formatted_data,
+                          ep_type = ep_type,
+                          priority = 1:length(outcomes),
+                          arm.name = levels,
+                          tau = tau,
+                          np_direction = np_direction,
+                          Z_t_trt = Z_t_trt,
+                          Z_t_con = Z_t_con, 
+                          method = method,
+                          stratum.weight = stratum.weight,
+                          pvalue = pvalue,
+                          alpha=alpha,
+                          summary.print=FALSE
     )
-  }))
-  
-  colnames(estimates)[-1] <- c("estimate","lower","upper")
-  
-  estimates$p <- c(out$p_value)
+    
+    FALSE
+  }, error=function(e){e})
 
-  # Win/loss/tie proportions only make sense to report if unstratified
-  if(length(stratum)==0){
-    estimates$win <- out$Win_prop$P_trt
-    estimates$loss <- out$Win_prop$P_con    
-    estimates$tie <- 1 - (out$Win_prop$P_trt + out$Win_prop$P_con)
+  if("error" %in% class(didError)){
+    
+    showModal(modalDialog(
+      title="Error",
+      sprintf("%s",didError$message),
+      easyClose=TRUE,
+      footer=NULL
+    ))
+    
+    estimates <- data.frame(outcome=NA,
+                            estimate=NA,
+                            lower=NA,
+                            upper=NA,
+                            p=NA,
+                            win=NA,
+                            loss=NA,
+                            tie=NA)
     
   } else {
-    estimates$win <- NA
-    estimates$loss <- NA    
-    estimates$tie <- NA
+    
+    # Format results into a table to report back
+    
+    estimates <- do.call("rbind",lapply(names(out$Win_statistic),function(i){
+      cbind(outcome=i,
+            as.data.frame(matrix(out$Win_statistic[[i]],nrow=1))
+      )
+    }))
+    
+    colnames(estimates)[-1] <- c("estimate","lower","upper")
+    
+    estimates$p <- c(out$p_value)
+    
+    # Win/loss/tie proportions only make sense to report if unstratified
+    if(length(stratum)==0){
+      estimates$win <- out$Win_prop$P_trt
+      estimates$loss <- out$Win_prop$P_con    
+      estimates$tie <- 1 - (out$Win_prop$P_trt + out$Win_prop$P_con)
+      
+    } else {
+      estimates$win <- NA
+      estimates$loss <- NA    
+      estimates$tie <- NA
+    }
+    
   }
   
   estimates

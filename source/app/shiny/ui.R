@@ -11,6 +11,18 @@ source("R/constructor_functions.R")
 # Define UI for application that draws a histogram
 ui <- fluidPage(
   
+  tags$head(tags$style(
+    HTML(".shiny-notification {
+              height: 100px;
+              width: 800px;
+              position:fixed;
+              top: calc(50% - 50px);;
+              left: calc(50% - 400px);;
+            }
+           "
+    )
+  )),
+
   # Application title
   titlePanel("Generalised Pairwise Comparisons"),
   

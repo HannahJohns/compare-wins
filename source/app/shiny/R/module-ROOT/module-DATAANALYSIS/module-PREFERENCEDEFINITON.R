@@ -94,6 +94,7 @@ list(
             preferenceList_tmp[[length(preferenceList_tmp)+1]] <- list(
               type="numeric",
               var=colnames(data_sheet)[1],
+              tau=0,
               indicator=colnames(data_sheet)[1],
               direction=">"
             )
@@ -164,6 +165,7 @@ list(
         varIdLabels <- c(
           type="PREFDEF__component_type_",
           var="PREFDEF__component_var_",
+          tau="PREFDEF__component_tau_",
           indicator="PREFDEF__component_censor_",
           direction="PREFDEF__component_direction_"
         )
@@ -226,6 +228,12 @@ list(
                                    label = "Outcome variable is:",
                                    choices = colnames(data_sheet),
                                    selected=new_preferences[[i]][["var"]]
+                       )),
+                       div(class="PREFDEF__preference_value",
+                           numericInput(inputId = sprintf("PREFDEF__component_tau_%d",i),
+                                        label = "Clinical Difference Threshold:",
+                                        value = new_preferences[[i]][["tau"]],
+                                        min=0
                        )),
                        # Conditional Panel for specifying second variable
                        conditionalPanel(sprintf("input.PREFDEF__component_type_%d=='surv'",i),

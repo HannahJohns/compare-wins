@@ -700,7 +700,6 @@ list(
 
       print(stratum)
 
-
       # Need to get a list of strata
       if(length(stratum)>0){
         if(length(stratum)==1){
