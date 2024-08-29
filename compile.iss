@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "Clinician GPC"
-#define MyAppVersion "0.0.1"
+#define MyAppVersion "0.1.0"
 #define MyAppPublisher "Australian Stroke Alliance"
 #define MyAppURL "https://github.com/HannahJohns/clinician-gpc"
 #define MyAppExeName "run.bat"
