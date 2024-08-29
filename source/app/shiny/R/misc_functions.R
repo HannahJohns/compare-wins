@@ -25,22 +25,51 @@
 #              )
 
 
+# Wrapper function for interfacing with underlying stats software.
+# Output should be a data frame with the following criteria:
+# First column is method name
+# After that currently nothing but this is stupid and will cause things to
+# break once we start adding e.g. plots, so it needs standardised.
 
-# Wrapper function for interfacing with WINS::win.stat
-# Gives the following:
-# Estimate: Overall results. If unstratified, also gives us explicit win/loss/tie proportions
-# Decomposed Estimate: Decomposition of the preference heirarchy with results individually and cumulative.
-                       # Only calculated if unstratified.
-# Estimates_by_stratum: Results by stratum including explicit win/loss/tie proportion and decomposition
+run_analysis <- function(args, method){
+  
+  # Some sort of default value
+  out <- data.frame(outcome=NA,estimate=NA)
+  
+  if(method=="wins"){
+    out <- wins_wrapper(data=args$data,
+                        outcomes=args$outcomes,
+                        arm=args$arm,
+                        levels=args$levels,
+                        stratum=args$stratum,
+                        covariates=args$covariates,
+                        method = args$method,
+                        stratum.weight = args$stratum.weight,
+                        pvalue = "two-sided",
+                        alpha=args$alpha
+                      )
+    
+  } else if (method=="pim"){
+    out <- pim_wrapper()
+  }
+  
+  out
+  
+}
 
+# pim::pim
+pim_wrapper <-  function(){
+  stop("PIM isn't implemented yet!")
+}
+
+# WINS::win.stat
 wins_wrapper <- function(data, outcomes, arm, levels,
                          stratum=NULL,
                          covariates=NULL,
                          method = "unadjusted",
                          stratum.weight = "MH-type",
                          pvalue = "two-sided",
-                         alpha=0.05,
-                         decompose = TRUE
+                         alpha=0.05
 ){
   
   # print("ATTEMPTING TO RUN WINS_WRAPPER")
