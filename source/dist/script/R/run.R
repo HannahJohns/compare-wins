@@ -11,8 +11,21 @@ if (!dir.exists(applibpath)) {
 
 .libPaths(c(applibpath, .Library))
 
-message('library paths:\n', paste('... ', .libPaths(), sep='', collapse='\n'))
-message('working path:\n', paste('...', appwd))
+# This should only be run during debugging
+if(TRUE){
+  sink(file="log.txt")
+  cat(sprintf('library paths:\n%s', paste('... ', .libPaths(), sep='', collapse='\n')))
+  cat("\n")
+  cat(sprintf('working path:\n%s', paste('...', appwd)))
+  
+  cat("\nAvailable packages are:\n")
+  
+  print(rownames(installed.packages()))
+  
+  
+  sink()
+  
+}
 
 # utility function for ensuring that a package is installed
 ensure = function(package, repo = 'http://cran.rstudio.com', load = FALSE) {

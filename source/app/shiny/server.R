@@ -10,6 +10,7 @@ library(DT)
 
 
 library(rlang)
+library(tidyverse)
 # a <- substitute({x <- 1})
 # b <- substitute({x <- x+1})
 # 
@@ -17,6 +18,8 @@ library(rlang)
 # eval(
 #   str2expression(paste(lapply(list(a,b),\(x){expr_text(x)}),collapse="\n"))
 #   )
+
+source("R/misc_functions.R")
 
 module_list <- dir("R/module-ROOT/",recursive = T)
 module_list <- module_list[grepl("/module-",module_list)]

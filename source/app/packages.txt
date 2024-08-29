@@ -11,6 +11,7 @@ jsonlite
 rlang
 tidyverse
 shiny
+crosstalk
 shinyBS
 DT
 WINS

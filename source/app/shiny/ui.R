@@ -1,5 +1,6 @@
 
 library(shiny)
+library(shinyBS)
 library(DT)
 
 source("R/constructor_functions.R")
@@ -10,6 +11,18 @@ source("R/constructor_functions.R")
 # Define UI for application that draws a histogram
 ui <- fluidPage(
   
+  tags$head(tags$style(
+    HTML(".shiny-notification {
+              height: 100px;
+              width: 800px;
+              position:fixed;
+              top: calc(50% - 50px);;
+              left: calc(50% - 400px);;
+            }
+           "
+    )
+  )),
+
   # Application title
   titlePanel("Generalised Pairwise Comparisons"),
   
@@ -17,5 +30,5 @@ ui <- fluidPage(
   do.call("tabsetPanel",construct_tabset_ui("R/module-ROOT")),
   
   fluidRow(hr()),
-  fluidRow("Version 0.0.1")
+  fluidRow("Version 0.1.0")
 )

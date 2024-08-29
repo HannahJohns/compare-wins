@@ -12,10 +12,6 @@ list(
                               Shiny.onInputChange('PREFDEF__uiUpdateId',this.id);
                               Shiny.onInputChange('PREFDEF__uiUpdateId_update',Math.random());
                              });"),
-    tags$script("$(document).on('change', '.PREFDEF__preference_value select', function () {
-                              Shiny.onInputChange('PREFDEF__preferenceValueId',this.id);
-                              Shiny.onInputChange('PREFDEF__preferenceValueId_update',Math.random());
-                             });"),
     fluidRow(
       radioButtons("PREFDEF__preferenceType", "Preferences are based on:",
                    choices = c("Heirarchy" = "heirarchical") #, "List" = "list")
@@ -63,9 +59,6 @@ list(
       )
     )
     
-    
-    
-                                           
     # If an action was taken that causes structural change to 
     # Preference list (i.e. added/removed/re-ordered details)
     # Make these changes as neccesary 
@@ -81,13 +74,6 @@ list(
         # Get preference list to modify
         preferenceList_tmp <- isolate(PREFDEF__preferenceHeirarchy())
          
-        # # If we've swapped the preference type, wipe the preference object
-        # if(!(input$PREFDEF__preferenceType %in% class(preferenceList_tmp))){
-        #   preferenceList_tmp <- list()
-        #   class(preferenceList_tmp) <- c(class(preferenceList_tmp),input$PREFDEF__preferenceType)
-        # }
-        
-        
         selectedId <- isolate(input$PREFDEF__uiUpdateId)
         
         #Update preference list structure (e.g. shuffle, delete, etc) and then signal to update UI elements
@@ -97,6 +83,7 @@ list(
             preferenceList_tmp[[length(preferenceList_tmp)+1]] <- list(
               type="numeric",
               var=colnames(data_sheet)[1],
+              tau=0,
               indicator=colnames(data_sheet)[1],
               direction=">"
             )
@@ -123,8 +110,6 @@ list(
           
           if(is.na(change_number)) stop("unexpeced non-numeric value")
           
-          #TODO: Write this
-          
           if(actType == "up" & change_number > 1){
             new_order <- 1:length(preferenceList_tmp)
             
@@ -144,11 +129,7 @@ list(
             preferenceList_tmp <- preferenceList_tmp[-change_number]
           }
           
-          # redundant
-          # class(preferenceList_tmp) <- c("list","heirarchical")
-          
           PREFDEF__preferenceHeirarchy(preferenceList_tmp)
-          
         }
         
         # Signal to UI to update
@@ -160,38 +141,71 @@ list(
     })
     
     # Observer for changing PREFDEF__preferenceHeirarchy in response to UI input
-    observe({
-      input$PREFDEF__preferenceValueId_update
-      
-      if (!is.null(input$PREFDEF__preferenceValueId)) {
+    
+    observeEvent(
+      lapply(
+        inputCollection(
+          c("PREFDEF__component_type_",
+            "PREFDEF__component_var_",
+            "PREFDEF__component_tau_",
+            "PREFDEF__component_censor_",
+            "PREFDEF__component_direction_"
+            ),
+          1:length(isolate(PREFDEF__preferenceHeirarchy()))
+        ),
+        function(x) input[[x]]
+      ),{
         
-        changed_id <- isolate(input$PREFDEF__preferenceValueId)
-        changed_value <- isolate(input[[changed_id]])
-
-        # Parse out the type of change
-        varIdLabels <- c(
-          type="PREFDEF__component_type_",
-          var="PREFDEF__component_var_",
-          indicator="PREFDEF__component_censor_",
-          direction="PREFDEF__component_direction_"
+        # Get a list of all relevant components
+        inputNames <- inputCollection(
+          c("PREFDEF__component_type_",
+            "PREFDEF__component_var_",
+            "PREFDEF__component_tau_",
+            "PREFDEF__component_censor_",
+            "PREFDEF__component_direction_"
+          ),
+          1:length(isolate(PREFDEF__preferenceHeirarchy()))
         )
-
-        changeType <- which(sapply(varIdLabels,grepl,x=changed_id))
-        changeType <- names(varIdLabels)[changeType]
-        if(length(changeType)!=1){
-          stop("Something is wrong")
-        }
-
-        change_number <- as.numeric(gsub(varIdLabels[changeType],"",changed_id))
-
-        if(is.na(change_number)) stop("unexpeced non-numeric value")
-
+        
+        
+        obj <- lapply(inputNames,function(x){input[[x]]})
+        names(obj) <- inputNames
+        
         preferenceList_tmp <- isolate(PREFDEF__preferenceHeirarchy())
-        preferenceList_tmp[[change_number]][[changeType]] <- changed_value
-        PREFDEF__preferenceHeirarchy(preferenceList_tmp)
-      }
-      
+        
+        if(length(preferenceList_tmp)>0){
+          
+          lapply(inputNames, function(i){
+            
+            # Extract out what the name "i" corresponds to
+            varIdLabels <- c(
+              type="PREFDEF__component_type_",
+              var="PREFDEF__component_var_",
+              tau="PREFDEF__component_tau_",
+              indicator="PREFDEF__component_censor_",
+              direction="PREFDEF__component_direction_"
+            )
+            
+            changeType <- which(sapply(varIdLabels,grepl,x=i))
+            changeType <- names(varIdLabels)[changeType]
+            if(length(changeType)!=1){
+              stop("Something is wrong")
+            }
+            
+            change_number <- as.numeric(gsub(varIdLabels[changeType],"",i))
+            
+            # Violating scope is not ideal but it works
+            preferenceList_tmp[[change_number]][[changeType]] <<- obj[[i]]
+            
+            NULL
+          })
+          
+          PREFDEF__preferenceHeirarchy(preferenceList_tmp)
+          
+        }
+        
     })
+
 
     # UI output for preference list 
     output$PREFDEF__components <- renderUI({
@@ -223,22 +237,21 @@ list(
             do.call("tagList", lapply(1:length(new_preferences), function(i){
               fluidRow(
               flowLayout(
-                       div(class="PREFDEF__preference_value",
+                       div(
                        selectInput(inputId = sprintf("PREFDEF__component_type_%d",i),
                                    label = "This outcome is:",
                                    choices = c("Numeric"="numeric","Ordinal"="ordinal","Survival"="surv"),
                                    selected=new_preferences[[i]][["type"]]
                        )),
-                       div(class="PREFDEF__preference_value",
+                       div(
                        selectInput(inputId = sprintf("PREFDEF__component_var_%d",i),
                                    label = "Outcome variable is:",
                                    choices = colnames(data_sheet),
                                    selected=new_preferences[[i]][["var"]]
-                                   
                        )),
                        # Conditional Panel for specifying second variable
                        conditionalPanel(sprintf("input.PREFDEF__component_type_%d=='surv'",i),
-                                        div(class="PREFDEF__preference_value",
+                                        div(
                                         selectInput(inputId = sprintf("PREFDEF__component_censor_%d",i),
                                                     label = "Censor indicator is:",
                                                     choices = colnames(data_sheet),
@@ -246,7 +259,13 @@ list(
                                         )
                                         )
                        ),
-                       div(class="PREFDEF__preference_value",
+                       div(
+                           numericInput(inputId = sprintf("PREFDEF__component_tau_%d",i),
+                                        label = "Clinical Difference Threshold:",
+                                        value = new_preferences[[i]][["tau"]],
+                                        min=0
+                       )),
+                       div(
                        # This should really be radiobuttons but I couldn't work out how to get
                        # javascript to behave. Making it dropdown was the easiest solution
                        selectInput(inputId = sprintf("PREFDEF__component_direction_%d",i),
