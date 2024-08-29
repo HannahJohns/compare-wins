@@ -16,10 +16,6 @@
 # This is a test of some code:
 # https://stackoverflow.com/questions/51621348/r-shiny-store-the-user-input-from-multiple-dynamically-generated-textareainput-f/51622007#51622007
 
-# TODO: need some way to select multiple components for this
-# Can use a wrapper function that obscures some of the nonsense here
-
-
 
 list(
   module_name = "DATAANALYSIS",
@@ -44,7 +40,7 @@ list(
       # )
     ),
     mainPanel(
-      fluidRow(tableOutput("DATAANALYSIS__wins_output"))
+      fluidRow(uiOutput("DATAANALYSIS__wins_output_ui"))
     )
   ),
   server_element = substitute({
@@ -226,6 +222,7 @@ list(
       
     })
     
+    
     # Observer for changing DATAANALYSIS__covariates in response to UI input
     # This doesn't require the same janky JS script hooks as there's not really
     # any need to track what the last button press was
@@ -281,7 +278,6 @@ list(
               NULL
             })
             
-            print(covariates_tmp)
             DATAANALYSIS__covariates(covariates_tmp)
             
           }
@@ -298,8 +294,6 @@ list(
       data_sheet <- SYMBOLIC_LINK__data_sheet()
       
       input$DATAANALYSIS__uiUpdateId_update
-      
-      print(input$DATAANALYSIS__uiUpdateId)
       
       if (!is.null(input$DATAANALYSIS__uiUpdateId)) {
         
@@ -501,7 +495,6 @@ list(
       
       input$DATAANALYSIS__surv_uiUpdateId_update
       
-      print(input$DATAANALYSIS__surv_uiUpdateId)
 
       if (!is.null(input$DATAANALYSIS__surv_uiUpdateId)) {
         
@@ -630,7 +623,6 @@ list(
             NULL
           })
           
-          print(covariates_tmp)
           DATAANALYSIS__surv_covariates(covariates_tmp)
           
         }
@@ -686,9 +678,9 @@ list(
       stratum <- NULL
       covariates <- NULL
 
-      print("Stratum are:")
+      # print("Stratum are:")
 
-      print(isolate(DATAANALYSIS__covariates()))
+      # print(isolate(DATAANALYSIS__covariates()))
 
       stratum <- sapply(isolate(DATAANALYSIS__covariates()), function(x){
         if(x[["stratify"]]){
@@ -698,7 +690,7 @@ list(
         }
       })
 
-      print(stratum)
+      # print(stratum)
 
       # Need to get a list of strata
       if(length(stratum)>0){
@@ -711,14 +703,14 @@ list(
         n_strata <- 0
       }
 
-      print("Covariates are:")
+      # print("Covariates are:")
 
-      print(isolate(DATAANALYSIS__surv_covariates()))
+      # print(isolate(DATAANALYSIS__surv_covariates()))
       covariates <- sapply(isolate(DATAANALYSIS__surv_covariates()), function(x){
         return(x[["var"]])
       })
 
-      print(covariates)
+      # print(covariates)
 
       out <- NULL
       if(!is.null(arm)){
@@ -823,7 +815,9 @@ list(
                 )
                 
                 colnames(estimate_by_outcome) <- paste(colnames(estimate_by_outcome))
-                estimate_by_outcome <- cbind(level=i,estimate_by_outcome)
+                estimate_by_outcome <- cbind(level=i,
+                                             level_var=outcomes[[i]]$var,
+                                             estimate_by_outcome)
                 
                 write(sprintf("Done"), stderr())  
                 write(sprintf("Facets 1 to %d",i), stderr())  
@@ -842,7 +836,9 @@ list(
                 )
                 
                 colnames(estimate_by_cumulative_outcome)[-1] <- paste(colnames(estimate_by_cumulative_outcome)[-1],"cumulative",sep="_")
-                estimate_by_cumulative_outcome <- cbind(level=i,estimate_by_cumulative_outcome)
+                estimate_by_cumulative_outcome <- cbind(level=i,
+                                                        level_var=outcomes[[i]]$var,
+                                                        estimate_by_cumulative_outcome)
                 
                 write(sprintf("Done"), stderr())  
                 write(sprintf("Facets 1 to %d",i), stderr())  
@@ -867,14 +863,26 @@ list(
                 strata_column <-apply(data_sheet[,stratum],1,paste)
               }
               
+
+
               stratified_data_sheet <- by(data = data_sheet,
                                           INDICES = strata_column,
                                           function(x){x}
               )
               
+              
+              # This is incredibly dumb but it will work
+              strata_values <- by(data = data.frame(strata_column=strata_column),
+                                  INDICES = strata_column,
+                                  function(x){unique(x$strata_column)}
+              )
+              
               for(j in 1:length(stratified_data_sheet)){
                 
+                
                 incProgress(1/total_run,detail = sprintf("Strata %d",j))
+                
+                strata_val <- strata_values[[j]]
                 
                 strata_estimate <-  wins_wrapper(data = stratified_data_sheet[[j]],
                                                  outcomes=outcomes,
@@ -904,7 +912,9 @@ list(
                     )
                     
                     colnames(estimate_by_outcome) <- paste(colnames(estimate_by_outcome))
-                    estimate_by_outcome <- cbind(level=i,estimate_by_outcome)
+                    estimate_by_outcome <- cbind(level=i,
+                                                 level_var=outcomes[[i]]$var,
+                                                 estimate_by_outcome)
                     
                     incProgress(1/total_run,detail = sprintf("Strata %d Component %d...",j,i))
                     estimate_by_cumulative_outcome <- wins_wrapper(data = data_sheet,
@@ -919,7 +929,9 @@ list(
                     )
                     
                     colnames(estimate_by_cumulative_outcome)[-1] <- paste(colnames(estimate_by_cumulative_outcome)[-1],"cumulative",sep="_")
-                    estimate_by_cumulative_outcome <- cbind(level=i,estimate_by_cumulative_outcome)
+                    estimate_by_cumulative_outcome <- cbind(level=i,
+                                                            level_var=outcomes[[i]]$var,
+                                                            estimate_by_cumulative_outcome)
                     
                     # THE INDEX IS WRONG HERE!!!!!!
                     
@@ -936,9 +948,8 @@ list(
                   tmp_decomposed_estimate <- NULL
                 }
                 
-                
-                
-                estimates_by_stratum[[j]] <- list(estimate=strata_estimate,
+                estimates_by_stratum[[j]] <- list(strata_val = strata_val,
+                                                  estimate=strata_estimate,
                                                   decomposed_estimate=tmp_decomposed_estimate)
                 
               } # End for strata
@@ -957,13 +968,63 @@ list(
         
         
       } # End if not null arm
-
+      
       print(out)
       DATAANALYSIS__results(out)
     })
     
+    
+    
+    reactive_force_results_update <- reactiveVal(0)
+    output$DATAANALYSIS__wins_output_ui <- renderUI({
+      
+      reactive_force_results_update()
+      results <- DATAANALYSIS__results()
+      print(results)
+      
+      print("Rendering UI output")
+      
+      out <- list()
+      
+      if(!is.null(results$estimate)){
+        out[[length(out)+1]] <- fluidRow(tableOutput("DATAANALYSIS__wins_output"))
+      }
+    
+
+      if(!is.null(results$decomposed_estimate)){
+        out[[length(out)+1]] <- fluidRow(tableOutput("DATAANALYSIS__wins_output_decompsition"))
+      }
+
+      if(!is.null(DATAANALYSIS__results()$estimates_by_stratum)){
+        out[[length(out)+1]] <- fluidRow(tableOutput("DATAANALYSIS__wins_output_by_stratum"))
+      }
+
+      
+      out <- do.call("tagList",out)
+      out
+    })  
+    
     output$DATAANALYSIS__wins_output <- renderTable({
       DATAANALYSIS__results()$estimate
+    })
+    
+    output$DATAANALYSIS__wins_output_decompsition <- renderTable({
+      DATAANALYSIS__results()$decomposed_estimate
+    })
+    
+    
+    output$DATAANALYSIS__wins_output_by_stratum <- renderTable({
+      results <- DATAANALYSIS__results()
+      out <- NULL
+      
+      if(length(results$estimates_by_stratum)>0){
+        out <- do.call("rbind",lapply(1:length(results$estimates_by_stratum),function(i){
+          cbind(strata=results$estimates_by_stratum[[i]]$strata_val,
+                results$estimates_by_stratum[[i]]$estimate)
+        }))
+      }
+      
+      out
     })
     
     

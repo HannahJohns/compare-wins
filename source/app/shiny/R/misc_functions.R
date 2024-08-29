@@ -42,7 +42,7 @@ wins_wrapper <- function(data, outcomes, arm, levels,
                          alpha=0.05,
                          decompose = TRUE
 ){
-   
+  
   # print("ATTEMPTING TO RUN WINS_WRAPPER")
   # # This needs deleted before pull request to merge with main
   # trace <- list(data = data,
@@ -99,6 +99,24 @@ wins_wrapper <- function(data, outcomes, arm, levels,
     if(ep_type[i] %in% c("surv","tte")){
       ep_type[i] <- "tte"
       formatted_data[,sprintf("Delta_%d",i)]  <- data[,outcomes[[i]]$indicator]
+      
+      if(length(
+        setdiff(
+          unique(formatted_data[,sprintf("Delta_%d",i)]),
+          0:1
+          )
+      ) >0 ){
+        
+        # should be a pop-up but can't see it at present
+        write(sprintf(
+          "%s includes values other than 1 and 0. All values not 1 assumed censored.",
+          outcomes[[i]]$var
+        ), stderr())
+        
+        formatted_data[,sprintf("Delta_%d",i)] <- ifelse(formatted_data[,sprintf("Delta_%d",i)]==1,1,0)        
+      } 
+      
+
     } 
   }
   
@@ -119,6 +137,7 @@ wins_wrapper <- function(data, outcomes, arm, levels,
     Z_t_trt <- Z_t_trt[which(formatted_data$arm==levels[1]),]
     Z_t_con <- Z_t_con[which(formatted_data$arm==levels[2]),]
   }
+  
   
   didError <- tryCatch({
     

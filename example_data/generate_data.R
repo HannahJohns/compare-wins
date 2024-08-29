@@ -30,8 +30,6 @@ df %>%
     fu_time = ifelse(fu_time<1,min_fu_time,fu_time)
   ) -> df
 
-
-
 ######################
 
 # Generate outcomes 
