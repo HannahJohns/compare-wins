@@ -50,20 +50,74 @@ run_analysis <- function(args, method){
                       )
     
   } else if (method=="pim"){
-    out <- pim_wrapper()
+    out <- pim_wrapper(data=args$data,
+                       outcomes=args$outcomes,
+                       arm=args$arm,
+                       levels=args$levels,
+                       stratum=args$stratum,
+                       covariates=args$covariates,
+                       pvalue = "two-sided",
+                       alpha=args$alpha)
   }
   
   out
   
 }
 
+
+
+
 # pim::pim
-pim_wrapper <-  function(){
+pim_wrapper <-  function(data, outcomes, arm, levels,
+                         preference_method="heirarchical", #This absolutely shouldn't have default arguments in production, but for now it's fine
+                         stratum=NULL,
+                         covariates=NULL,
+                         alpha=0.05,
+                         ){
+  
+  # Add save results stuff here
+  
+  
+  # This should ultimately be arguments
+  link <- "logit"
+  model  <- "difference"
+  
+  #TODO: Give options for this stuff here 
+  estim <- "estimator.nleqslv"
+  
+  ?estimators
+  
+  # Get data into the correct structure
+  
+  # Reasonably easy to get the RHS of the regression model working
+  formatted_data <- data[,c(arm,sapply(covariates,function(x){x$var}))]
+  formatted_data$arm <- factor(data[,arm])
+  
+  # LHS needs some massaging depending on preference definition
+  if(preference_method=="heirarchical"){
+    
+    # Need to take preferences and convert it into a numeric rank
+    
+    # First check that this is safe to do
+    
+    # Get grid of possible outcome combinations and rank them
+    
+    # Join this with the formatted data
+    
+  } else {
+    stop("NON-HEIRARCHICAL METHODS NOT IMPLEMENTED YET")
+  }
+  
+  browser()
   stop("PIM isn't implemented yet!")
+  
 }
+
+
 
 # WINS::win.stat
 wins_wrapper <- function(data, outcomes, arm, levels,
+                         preference_method="heirarchical", 
                          stratum=NULL,
                          covariates=NULL,
                          method = "unadjusted",
@@ -116,38 +170,45 @@ wins_wrapper <- function(data, outcomes, arm, levels,
     stratum.weight <- "unstratified"
   }
   
-  ep_type <- {}
-  np_direction <- {}
-  tau <- {}
-  for(i in 1:length(outcomes)){
-    ep_type[i] <- outcomes[[i]]$type
-    tau[i] <- outcomes[[i]]$tau
-    np_direction[i] <- c(`>`="larger",`<`="smaller")[outcomes[[i]]$direction]
+  if(preference_method=="heirarchical"){
     
-    formatted_data[,sprintf("Y_%d",i)] <- data[,outcomes[[i]]$var]
-    if(ep_type[i] %in% c("surv","tte")){
-      ep_type[i] <- "tte"
-      formatted_data[,sprintf("Delta_%d",i)]  <- data[,outcomes[[i]]$indicator]
+    ep_type <- {}
+    np_direction <- {}
+    tau <- {}
+    for(i in 1:length(outcomes)){
+      ep_type[i] <- outcomes[[i]]$type
+      tau[i] <- outcomes[[i]]$tau
+      np_direction[i] <- c(`>`="larger",`<`="smaller")[outcomes[[i]]$direction]
       
-      if(length(
-        setdiff(
-          unique(formatted_data[,sprintf("Delta_%d",i)]),
-          0:1
+      formatted_data[,sprintf("Y_%d",i)] <- data[,outcomes[[i]]$var]
+      if(ep_type[i] %in% c("surv","tte")){
+        ep_type[i] <- "tte"
+        formatted_data[,sprintf("Delta_%d",i)]  <- data[,outcomes[[i]]$indicator]
+        
+        if(length(
+          setdiff(
+            unique(formatted_data[,sprintf("Delta_%d",i)]),
+            0:1
           )
-      ) >0 ){
+        ) >0 ){
+          
+          # should be a pop-up but can't see it at present
+          write(sprintf(
+            "%s includes values other than 1 and 0. All values not 1 assumed censored.",
+            outcomes[[i]]$var
+          ), stderr())
+          
+          formatted_data[,sprintf("Delta_%d",i)] <- ifelse(formatted_data[,sprintf("Delta_%d",i)]==1,1,0)        
+        } 
         
-        # should be a pop-up but can't see it at present
-        write(sprintf(
-          "%s includes values other than 1 and 0. All values not 1 assumed censored.",
-          outcomes[[i]]$var
-        ), stderr())
         
-        formatted_data[,sprintf("Delta_%d",i)] <- ifelse(formatted_data[,sprintf("Delta_%d",i)]==1,1,0)        
       } 
-      
-
-    } 
+    }
+    
+  } else {
+    stop("NON-HEIRARCHICAL METHODS NOT IMPLEMENTED YET")
   }
+  
   
   # Only support covariates at baseline for the time being. 
   
