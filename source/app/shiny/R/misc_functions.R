@@ -34,30 +34,70 @@
 run_analysis <- function(args, method){
   
   # Some sort of default value
-  out <- data.frame(outcome=NA,estimate=NA)
+  out <- data.frame(outcome=NA,
+                    estimate=NA,
+                    lower=NA,
+                    upper=NA,
+                    p=NA,
+                    win=NA,
+                    loss=NA,
+                    tie=NA)
   
-  if(method=="wins"){
-    out <- wins_wrapper(data=args$data,
-                        outcomes=args$outcomes,
-                        arm=args$arm,
-                        levels=args$levels,
-                        stratum=args$stratum,
-                        covariates=args$covariates,
-                        method = args$method,
-                        stratum.weight = args$stratum.weight,
-                        pvalue = "two-sided",
-                        alpha=args$alpha
-                      )
+  # print("Attempting analysis")
+  # browser()
+  
+  didError <- tryCatch({
     
-  } else if (method=="pim"){
-    out <- pim_wrapper(data=args$data,
-                       outcomes=args$outcomes,
-                       arm=args$arm,
-                       levels=args$levels,
-                       stratum=args$stratum,
-                       covariates=args$covariates,
-                       pvalue = "two-sided",
-                       alpha=args$alpha)
+    if(method=="wins"){
+      
+      out <- wins_wrapper(data=args$data,
+                          outcomes=args$outcomes,
+                          arm=args$arm,
+                          levels=args$levels,
+                          stratum=args$stratum,
+                          covariates=args$covariates_censor,
+                          method = args$method,
+                          stratum.weight = args$stratum.weight,
+                          pvalue = "two-sided",
+                          alpha=args$alpha
+      )
+      
+    } else if (method=="pim"){
+      out <- pim_wrapper(data=args$data,
+                         outcomes=args$outcomes,
+                         arm=args$arm,
+                         levels=args$levels,
+                         stratum=args$stratum,
+                         covariates=args$covariates_effect,
+                         pvalue = "two-sided",
+                         alpha=args$alpha)
+    } else if(method=="debug"){
+      
+      filehash <- digest::digest(args)
+      saveRDS(
+        args,
+        file=sprintf("tmp_%s.RDS",filehash)
+      )
+      
+      out$hash <- filehash
+      
+      print("Results saved to disk")
+      
+    }
+    
+    FALSE
+  }, error=function(e){e})
+  
+  
+  if("error" %in% class(didError)){
+    
+    showModal(modalDialog(
+      title="Error",
+      sprintf("%s",didError$message),
+      easyClose=TRUE,
+      footer=NULL
+    ))
+    
   }
   
   out
@@ -67,12 +107,19 @@ run_analysis <- function(args, method){
 
 
 
+# tmp <- readRDS("source/app/shiny/tmp_06d100842179c784e5369eeb6423e198.RDS")
+# data <- tmp$data
+# outcomes <- tmp$outcomes
+# stratum <- tmp$stratum
+# covariates <- tmp$covariates
+
+
 # pim::pim
 pim_wrapper <-  function(data, outcomes, arm, levels,
                          preference_method="heirarchical", #This absolutely shouldn't have default arguments in production, but for now it's fine
                          stratum=NULL,
                          covariates=NULL,
-                         alpha=0.05,
+                         alpha=0.05
                          ){
   
   # Add save results stuff here
@@ -107,6 +154,8 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
   } else {
     stop("NON-HEIRARCHICAL METHODS NOT IMPLEMENTED YET")
   }
+  
+  
   
   browser()
   stop("PIM isn't implemented yet!")

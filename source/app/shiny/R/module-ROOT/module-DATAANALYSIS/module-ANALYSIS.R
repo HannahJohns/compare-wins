@@ -59,7 +59,8 @@ list(
         radioButtons("DATAANALYSIS__method",
                      label="Select analysis method:",
                      choices=c("Win Ratio Analysis"="wins",
-                               "Probabilistic Index Model Analysis"="pim"
+                               "Probabilistic Index Model Analysis"="pim",
+                               "DEBUG ONLY: SAVE TO DISK" = "debug"
                                )),
         # All of this should be nested inside conditional panels
         fluidRow(selectInput(inputId = "DATAANALYSIS__arm",
@@ -673,6 +674,9 @@ list(
       req(SYMBOLIC_LINK__data_sheet())
       req(SYMBOLIC_LINK__preference_export())
       
+      
+      # browser()
+      
       data_sheet <- isolate(SYMBOLIC_LINK__data_sheet())
       preferences <- isolate(SYMBOLIC_LINK__preference_export())
       arm <- isolate(input$DATAANALYSIS__arm)
@@ -680,20 +684,21 @@ list(
       # Parse out covariate details
 
       stratum <- NULL
-      covariates <- NULL
+      covariates_effect <- NULL
+      covariates_censor <- NULL
 
       # print("Stratum are:")
-
       # print(isolate(DATAANALYSIS__covariates()))
 
-      stratum <- sapply(isolate(DATAANALYSIS__covariates()), function(x){
+      stratum <- lapply(isolate(DATAANALYSIS__covariates()), function(x){
         if(x[["stratify"]]){
           return(x[["var"]])
         } else {
           return(NULL)
         }
       })
-
+      stratum <- do.call("c",stratum)
+      
       # print(stratum)
 
       # Need to get a list of strata
@@ -706,21 +711,30 @@ list(
       } else {
         n_strata <- 0
       }
-
+      
+      covariates_effect <- lapply(isolate(DATAANALYSIS__covariates()), function(x){
+        if(x[["stratify"]]){
+          return(NULL)
+        } else {
+          return(x[["var"]])
+        }
+      })
+      covariates_effect <- do.call("c",covariates_effect)
+      
+      
       # print("Covariates are:")
 
       # print(isolate(DATAANALYSIS__surv_covariates()))
-      covariates <- sapply(isolate(DATAANALYSIS__surv_covariates()), function(x){
+      covariates_censor <- sapply(isolate(DATAANALYSIS__surv_covariates()), function(x){
         return(x[["var"]])
       })
 
-      # print(covariates)
+      # print(covariates_censor)
 
       out <- NULL
       if(!is.null(arm)){
-        #TODO: At present, this only supports heirarchical output.
+        # TODO: At present, this only supports heirarchical output.
         # This needs fixed for use with e.g. PIM
-        
         
         alpha <- isolate(input$DATAANALYSIS__alpha)
 
@@ -780,6 +794,8 @@ list(
             adjust.method <- isolate(input$DATAANALYSIS__surv_covariate_strata_method)
           }
           
+          statistical.method <- isolate(input$DATAANALYSIS__method) 
+          
           withProgress(message = 'Analysing',detail = "Overall results", value = 0, {
             
             write(sprintf("Running Main Analysis"), stderr())
@@ -790,11 +806,12 @@ list(
                                           levels=levels,
                                           stratum = stratum,
                                           stratum.weight = stratum.weight,
-                                          covariates = covariates,
+                                          covariates_effect = covariates_effect,
+                                          covariates_censor = covariates_censor,
                                           method = adjust.method,
                                           alpha = alpha
                                       ),
-                                     "wins")
+                                     statistical.method)
 
             write(sprintf("Done"), stderr())
             
@@ -814,11 +831,12 @@ list(
                                                          levels=levels,
                                                          stratum = stratum,
                                                          stratum.weight = stratum.weight,
-                                                         covariates = covariates,
+                                                         covariates_effect = covariates_effect,
+                                                         covariates_censor = covariates_censor,
                                                          method = adjust.method,
                                                          alpha = alpha
                                                   ),
-                                                  "wins")
+                                                  statistical.method)
 
                 colnames(estimate_by_outcome) <- paste(colnames(estimate_by_outcome))
                 estimate_by_outcome <- cbind(level=i,
@@ -836,11 +854,12 @@ list(
                                                                     levels=levels,
                                                                     stratum = stratum,
                                                                     stratum.weight = stratum.weight,
-                                                                    covariates = covariates,
+                                                                    covariates_effect = covariates_effect,
+                                                                    covariates_censor = covariates_censor,
                                                                     method = adjust.method,
                                                                     alpha = alpha
                                                                 ),
-                                                                "wins")
+                                                               statistical.method)
 
                 
                 colnames(estimate_by_cumulative_outcome)[-1] <- paste(colnames(estimate_by_cumulative_outcome)[-1],"cumulative",sep="_")
@@ -898,11 +917,12 @@ list(
                                                       levels=levels,
                                                       stratum = stratum,
                                                       stratum.weight = stratum.weight,
-                                                      covariates = covariates,
+                                                      covariates_effect = covariates_effect,
+                                                      covariates_censor = covariates_censor,
                                                       method = adjust.method,
                                                       alpha = alpha
                                                 ),
-                                                "wins")
+                                                statistical.method)
                 
                 tmp_decomposed_estimate <- lapply(1:length(outcomes), function(i){NULL})
                 
@@ -916,11 +936,12 @@ list(
                                                               levels=levels,
                                                               stratum = stratum,
                                                               stratum.weight = stratum.weight,
-                                                              covariates = covariates,
+                                                              covariates_effect = covariates_effect,
+                                                              covariates_censor = covariates_censor,
                                                               method = adjust.method,
                                                               alpha = alpha
                                                         ),
-                                                        "wins")
+                                                        statistical.method)
                       
                     
                     colnames(estimate_by_outcome) <- paste(colnames(estimate_by_outcome))
@@ -935,7 +956,8 @@ list(
                                                                          levels=levels,
                                                                          stratum = stratum,
                                                                          stratum.weight = stratum.weight,
-                                                                         covariates = covariates,
+                                                                         covariates_effect = covariates_effect,
+                                                                         covariates_censor = covariates_censor,
                                                                          method = adjust.method,
                                                                          alpha = alpha
                                                                     ),
@@ -1038,15 +1060,6 @@ list(
       }
       
       out
-    })
-    
-    
-    observeEvent(input$DATAANALYSIS__save_button,{
-      out <- list(
-        data_sheet <- isolate(SYMBOLIC_LINK__data_sheet()),
-        preferences <- isolate(SYMBOLIC_LINK__preference_export())
-      )
-      saveRDS(out,file="tmp.RDS")
     })
     
   })
