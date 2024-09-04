@@ -59,8 +59,8 @@ list(
         radioButtons("DATAANALYSIS__method",
                      label="Select analysis method:",
                      choices=c("Win Ratio Analysis"="wins",
-                               "Probabilistic Index Model Analysis"="pim",
-                               "DEBUG ONLY: SAVE TO DISK" = "debug"
+                               "Probabilistic Index Model Analysis"="pim"
+                               # "DEBUG ONLY: SAVE TO DISK" = "debug"
                                )),
         # All of this should be nested inside conditional panels
         fluidRow(selectInput(inputId = "DATAANALYSIS__arm",

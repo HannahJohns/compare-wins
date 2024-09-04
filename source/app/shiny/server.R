@@ -3,21 +3,14 @@
 library(shiny)
 library(DT)
 
-# Demonstration of taking code from outside of server and injecting it into server
-# on startup.
-
-# This will let us build things in a modular fashion
-
+library(simsalapar)
+library(pim)
+library(WINS)
 
 library(rlang)
 library(tidyverse)
-# a <- substitute({x <- 1})
-# b <- substitute({x <- x+1})
-# 
-# # Combine expressions from each server 
-# eval(
-#   str2expression(paste(lapply(list(a,b),\(x){expr_text(x)}),collapse="\n"))
-#   )
+
+
 
 source("R/misc_functions.R")
 

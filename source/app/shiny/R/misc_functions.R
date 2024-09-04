@@ -3,27 +3,38 @@
 # it will work for now
 
 ################################################################################
-# source("R/generate_data.R")
-# df$age_strt <- ifelse(df$age < median(df$age),0,1)
 # 
-# my_outcomes <- list(
-#   list(var="deathTime",indicator="deathStatus",type="surv",direction=">"),
-#   list(var="hospTime",indicator="hospStatus",type="surv",direction=">"),
-#   list(var="rankin",type="numeric",direction="<")
+# Debug inputs based on captured results
+# 
+# hashList <- c(
+#   all = "837a52a7d897c1413ccad206d238e34f",
+#   indiv_1 = "2835ffb294f682cf0cdd1fc09c1fef87",
+#   indiv_2 = "b08781921ab059c048c6c2fb7c806387",
+#   cum_1 = "2835ffb294f682cf0cdd1fc09c1fef87",
+#   cum_2 = "837a52a7d897c1413ccad206d238e34f"
 # )
-# 
-# 
-# 
-# x <- wins_wrapper(df,outcomes = my_outcomes,
-#              arm = "trt",
-#              stratum = "age_strt",
-#              covariates = "age",
-#              levels = 1:0,
-#              method = "unadjusted",
-#              stratum.weight = "MH-type",
-#              pvalue = "two-sided"
-#              )
+# # 
+# tmp <- readRDS(sprintf("source/app/shiny/tmp_%s.RDS",
+# #                        hashList[2]
+# #                        ))
+# data <- tmp$data
+# args <- tmp
+# # 
+# outcomes <- tmp$outcomes
+# arm <- tmp$arm
+# levels <- tmp$levels
+# stratum <- tmp$stratum
+# covariates <- tmp$covariates_effect
+# alpha <- tmp$alpha
 
+
+# method <- "pim"
+
+
+
+
+
+################################################################################
 
 # Wrapper function for interfacing with underlying stats software.
 # Output should be a data frame with the following criteria:
@@ -46,7 +57,10 @@ run_analysis <- function(args, method){
   # print("Attempting analysis")
   # browser()
   
-  didError <- tryCatch({
+  
+  # TODO: add sanity checks and warnings for unused controls etc
+  
+  didError <- simsalapar::tryCatch.W.E({
     
     if(method=="wins"){
       
@@ -63,14 +77,15 @@ run_analysis <- function(args, method){
       )
       
     } else if (method=="pim"){
+      
       out <- pim_wrapper(data=args$data,
                          outcomes=args$outcomes,
                          arm=args$arm,
-                         levels=args$levels,
+                         levels=rev(args$levels), # levels is c(treat,control)
                          stratum=args$stratum,
                          covariates=args$covariates_effect,
-                         pvalue = "two-sided",
                          alpha=args$alpha)
+      
     } else if(method=="debug"){
       
       filehash <- digest::digest(args)
@@ -86,14 +101,24 @@ run_analysis <- function(args, method){
     }
     
     FALSE
-  }, error=function(e){e})
+  })
   
-  
-  if("error" %in% class(didError)){
+  if("error" %in% class(didError$value)){
     
     showModal(modalDialog(
       title="Error",
-      sprintf("%s",didError$message),
+      sprintf("%s",didError$value$message),
+      easyClose=TRUE,
+      footer=NULL
+    ))
+    
+  }
+  
+  if(!is.null(didError$warning)){
+    
+    showModal(modalDialog(
+      title="Warning",
+      sprintf("%s",didError$warning$message),
       easyClose=TRUE,
       footer=NULL
     ))
@@ -105,16 +130,6 @@ run_analysis <- function(args, method){
 }
 
 
-
-
-# tmp <- readRDS("source/app/shiny/tmp_06d100842179c784e5369eeb6423e198.RDS")
-# data <- tmp$data
-# outcomes <- tmp$outcomes
-# stratum <- tmp$stratum
-# covariates <- tmp$covariates
-
-
-# pim::pim
 pim_wrapper <-  function(data, outcomes, arm, levels,
                          preference_method="heirarchical", #This absolutely shouldn't have default arguments in production, but for now it's fine
                          stratum=NULL,
@@ -122,43 +137,200 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
                          alpha=0.05
                          ){
   
-  # Add save results stuff here
-  
-  
-  # This should ultimately be arguments
+  # This should ultimately be arguments the user can make
   link <- "logit"
   model  <- "difference"
-  
-  #TODO: Give options for this stuff here 
-  estim <- "estimator.nleqslv"
-  
-  ?estimators
-  
+  estim <- "estimator.nleqslv" # ?estimators
+
+    
   # Get data into the correct structure
   
   # Reasonably easy to get the RHS of the regression model working
-  formatted_data <- data[,c(arm,sapply(covariates,function(x){x$var}))]
-  formatted_data$arm <- factor(data[,arm])
+  formatted_data <- data.frame(
+    factor(data[,arm],levels=levels)
+  )
+  colnames(formatted_data) <- arm
+  # Need to convert to factor with specified active arm
+  
+  
+  
+  if(length(covariates)>0){
+    for(i in 1:length(covariates)){
+      formatted_data[,covariates[i]] <- data[,covariates[i]]
+    }
+  }
+  
+  
+  if(length(stratum)>0){
+    if(length(stratum)==1){
+      stratum <- data[,stratum]          
+    } else {
+      stratum <- do.call("paste", lapply(stratum, function(x){data[,x]}))   
+    }
+    stratum.weight <- "ivw" # Inverse variance weighting is the only method that
+                            # works for pim
+  } else {
+    stratum.weight <- "unstratified"
+  }
+  
   
   # LHS needs some massaging depending on preference definition
   if(preference_method=="heirarchical"){
     
-    # Need to take preferences and convert it into a numeric rank
-    
     # First check that this is safe to do
     
-    # Get grid of possible outcome combinations and rank them
+    if(prod(sapply(outcomes, function(x){x$type})=="numeric")!=1){
+      stop("Survival outcomes not supported")
+    }
+
     
-    # Join this with the formatted data
+    if(prod(sapply(outcomes, function(x){x$tau})==0)!=1){
+      stop("Non-zero thresholds for clinical difference not supported")
+    }
+    
+    # Take preferences and convert it into a numeric rank
+    
+    # This is a bit cursed but it works.
+
+    # First, get how each individual outcome should be ranked
+    outcome_rank <- lapply(outcomes,function(x){
+      new_outcome_var <- data[,x$var]
+      # Cast as factor so we can manipulate it
+      new_outcome_var <- factor(new_outcome_var)
+      
+      if(x$direction == "<"){
+        new_outcome_var <- factor(new_outcome_var,levels=rev(levels(new_outcome_var)))
+      }
+      as.numeric(new_outcome_var)
+    })
+    
+    # Then get this in a data frame that we can reference later. This provides
+    # a target for us to attach ranks to once they're calculated
+    outcome_rank_frame <- do.call("data.frame",outcome_rank)
+    colnames(outcome_rank_frame) <-  sapply(outcomes,function(x){x$var})
+
+    # Calculate ranks based unique values each outcome rank. High values are good.    
+    outcome_rank_value <- unique(outcome_rank_frame[do.call("order",outcome_rank),, drop=FALSE])
+    outcome_rank_value$`__ranked_result` <- 1:nrow(outcome_rank_value)
+    
+    # Join this to the data frame from before to get which values should be correct
+    outcome_rank_frame <- left_join(
+      outcome_rank_frame,
+      outcome_rank_value
+    )
+    
+    
+    # TODO: This will break if RESERVED_ranked_result is a name of a covariate
+    formatted_data$`RESERVED__ranked_result` <- outcome_rank_frame$`__ranked_result`
+   
     
   } else {
     stop("NON-HEIRARCHICAL METHODS NOT IMPLEMENTED YET")
   }
   
+  # 
+  # 
+  # 
+  # # Validation of this for debugging
+  # outcome_vars <- do.call("data.frame",
+  #                         lapply(outcomes,function(x){
+  #                           new_outcome_var <- data[,x$var]
+  #                           new_outcome_var
+  #                         })
+  # )
+  # colnames(outcome_vars) <- sapply(outcomes,function(x){x$var})
+  # cbind(outcome_vars,outcome_rank_frame$`__ranked_result`) %>% View()
+  
+  # Join this with the formatted data
+ 
   
   
-  browser()
-  stop("PIM isn't implemented yet!")
+  
+  # Run PIM
+  if(link=="logit"){
+    formula <- sprintf("%s~%s",
+                       "RESERVED__ranked_result",
+                       paste(c(arm,covariates),collapse="+")
+    )
+    formula <- as.formula(formula)
+  } else {
+    
+    # If we want risk difference etc we need different link functions here.
+    # This may require adding an intercept term to centre at no difference
+    stop("link functions other than logit not supported")
+    
+  }
+  
+  if(stratum.weight=="ivw"){
+
+    fit <- by(formatted_data,stratum, function(tmpdf){
+      pim(formula,data=tmpdf,link = link,model = model,estim=estim)
+    })
+    
+    fit <- do.call("rbind",lapply(fit,function(x){
+      data.frame(
+        estimate=coef(x)[paste0(arm,levels[2])],
+        var=diag(vcov(x))[paste0(arm,levels[2])]
+        )
+    }))
+
+    coefs <- sum(fit[,"estimate"]/fit[,"var"])/sum(1/fit[,"var"])
+    var <- 1/sum(1/fit[,"var"])
+    
+    conf_interval <- coefs + c(lower=-1,upper=1)*sqrt(var)*qnorm(1-alpha/2)
+    pval <- 2*pnorm(abs(coefs/sqrt(var)),lower.tail = F)
+    
+    # Transform results to be correct scale
+    if(link=="logit"){
+      coefs <- exp(coefs)
+      conf_interval <- exp(conf_interval)
+    }
+    
+    out <- data.frame(outcome="Win Odds",
+                      estimate=coefs,
+                      lower=conf_interval[1],
+                      upper=conf_interval[2],
+                      p=pval,
+                      win=NA,
+                      loss=NA,
+                      tie=NA)
+    
+  } else {
+    
+    fit <- pim(formula,data=formatted_data,link = link,model = model,estim=estim)
+    coefs <- coef(fit)[paste0(arm,levels[2])]
+    conf_interval <- confint(fit,level = 1-alpha)[paste0(arm,levels[2]),]
+    pval <- summary(fit)@pr[paste0(arm,levels[2])]
+   
+    # Transform results to be correct scale
+    if(link=="logit"){
+      coefs <- exp(coefs)
+      conf_interval <- exp(conf_interval)
+    }
+    
+    # Get win/losses/ties. This can be done by getting sign(diff(treatment, control))
+    wlt_count <- table(c(sign(outer(
+      formatted_data[formatted_data[,arm]==levels[2],"RESERVED__ranked_result"],
+      formatted_data[formatted_data[,arm]==levels[1],"RESERVED__ranked_result"],
+      "-"
+    ))))
+    names(wlt_count) <- c("-1"="loss","0"="tie","1"="win")[names(wlt_count)]
+    wlt_count <- wlt_count/sum(wlt_count)
+
+
+    out <- data.frame(outcome="Win Odds",
+                      estimate=coefs,
+                      lower=conf_interval[1],
+                      upper=conf_interval[2],
+                      p=pval,
+                      win=wlt_count["win"],
+                      loss=wlt_count["loss"],
+                      tie=wlt_count["tie"]
+                      )
+  }
+  
+  rownames(out) <- NULL
+  out
   
 }
 
