@@ -58,6 +58,9 @@ run_analysis <- function(args, method){
   
   # TODO: add sanity checks and warnings for unused controls etc
   
+  # TODO: Also add interpretation of common error messages rather than feeding
+  # back raw messages to the user
+  
   didError <- simsalapar::tryCatch.W.E({
     
     if(length(args$levels)!=2) stop("There should be exactly 2 treatment groups")
@@ -77,6 +80,8 @@ run_analysis <- function(args, method){
       )
       
     } else if (method=="pim"){
+      
+      warning("Currently no way to specify estimator")
       
       out <- pim_wrapper(data=args$data,
                          outcomes=args$outcomes,

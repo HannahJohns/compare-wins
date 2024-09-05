@@ -104,10 +104,46 @@ list(
         fluidRow(
           bsCollapsePanel("Statistical controls",
                           fluidPage(
+                            
                             fluidRow(
                               numericInput("DATAANALYSIS__alpha",label = "Type-I error (α)",
                                            value = 0.05,min = 0,max = 1,step = 0.01)
-                            )
+                            ),
+                            
+                            # Some methods will have specific options they care about.
+                            # Controls for these are here:
+                            
+                            conditionalPanel("input.DATAANALYSIS__method=='pim'",
+                              fluidRow(
+                                selectInput("DATAANALYSIS__pim_estimator",
+                                            label = "Fitting Method",
+                                            choices = c("Broyden/Newton"="estimator.nleqslv",
+                                                        "Generalised Linear"="estimator.glm",
+                                                        "Barzilai-Borwein"="estimator.BB"
+                                                        )
+                                            )
+                              ),
+                              # TODO: Need to add options here
+                              conditionalPanel("input.DATAANALYSIS__pim_estimator=='estimator.nleqslv'",
+                                               fluidRow(
+                                               "NLEQSV solver arguments here"
+                                               )
+                              ),
+                              conditionalPanel("input.DATAANALYSIS__pim_estimator=='estimator.glm'",
+                                               fluidRow(
+                                                 "GLM solver arguments here"
+                                               )
+                              ),
+                              conditionalPanel("input.DATAANALYSIS__pim_estimator=='estimator.BB'",
+                                               fluidRow(
+                                                 "BB solver arguments here"
+                                               )
+                              )
+                            ) # End PIM controls
+                            
+                            
+                            
+                            
                           )
           )
         ),
@@ -695,9 +731,6 @@ list(
     observeEvent(input$DATAANALYSIS__analysis_go,{
       req(SYMBOLIC_LINK__data_sheet())
       req(SYMBOLIC_LINK__preference_export())
-      
-      
-      # browser()
       
       data_sheet <- isolate(SYMBOLIC_LINK__data_sheet())
       preferences <- isolate(SYMBOLIC_LINK__preference_export())
