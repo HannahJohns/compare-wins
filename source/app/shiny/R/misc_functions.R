@@ -31,9 +31,6 @@
 # method <- "pim"
 
 
-
-
-
 ################################################################################
 
 # Wrapper function for interfacing with underlying stats software.
@@ -44,6 +41,10 @@
 
 run_analysis <- function(args, method){
   
+  print(sprintf("Running %s with args",method))
+  print(args)
+  
+  
   # Some sort of default value
   out <- data.frame(outcome=NA,
                     estimate=NA,
@@ -53,15 +54,14 @@ run_analysis <- function(args, method){
                     win=NA,
                     loss=NA,
                     tie=NA)
-  
-  # print("Attempting analysis")
-  # browser()
-  
+
   
   # TODO: add sanity checks and warnings for unused controls etc
   
   didError <- simsalapar::tryCatch.W.E({
     
+    if(length(args$levels)!=2) stop("There should be exactly 2 treatment groups")
+
     if(method=="wins"){
       
       out <- wins_wrapper(data=args$data,
@@ -84,6 +84,7 @@ run_analysis <- function(args, method){
                          levels=rev(args$levels), # levels is c(treat,control)
                          stratum=args$stratum,
                          covariates=args$covariates_effect,
+                         stratum.weight = args$stratum.weight,
                          alpha=args$alpha)
       
     } else if(method=="debug"){
@@ -100,32 +101,21 @@ run_analysis <- function(args, method){
       
     }
     
-    FALSE
+    NULL
   })
   
-  if("error" %in% class(didError$value)){
-    
-    showModal(modalDialog(
-      title="Error",
-      sprintf("%s",didError$value$message),
-      easyClose=TRUE,
-      footer=NULL
-    ))
-    
-  }
+  print(list(out=out,
+             warning=didError$warning,
+             error=didError$value
+  ))
   
-  if(!is.null(didError$warning)){
-    
-    showModal(modalDialog(
-      title="Warning",
-      sprintf("%s",didError$warning$message),
-      easyClose=TRUE,
-      footer=NULL
-    ))
-    
-  }
   
-  out
+  return(
+    list(out=out,
+         warning=didError$warning,
+         error=didError$value
+         )
+  )
   
 }
 
@@ -134,6 +124,7 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
                          preference_method="heirarchical", #This absolutely shouldn't have default arguments in production, but for now it's fine
                          stratum=NULL,
                          covariates=NULL,
+                         stratum.weight="ivw",
                          alpha=0.05
                          ){
   
@@ -161,14 +152,12 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
   }
   
   
-  if(length(stratum)>0){
+  if(length(stratum)>0 & stratum.weight != "unstratified"){
     if(length(stratum)==1){
       stratum <- data[,stratum]          
     } else {
       stratum <- do.call("paste", lapply(stratum, function(x){data[,x]}))   
     }
-    stratum.weight <- "ivw" # Inverse variance weighting is the only method that
-                            # works for pim
   } else {
     stratum.weight <- "unstratified"
   }
@@ -228,9 +217,6 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
     stop("NON-HEIRARCHICAL METHODS NOT IMPLEMENTED YET")
   }
   
-  # 
-  # 
-  # 
   # # Validation of this for debugging
   # outcome_vars <- do.call("data.frame",
   #                         lapply(outcomes,function(x){
@@ -295,7 +281,7 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
                       loss=NA,
                       tie=NA)
     
-  } else {
+  } else if (stratum.weight=="unstratified"){
     
     fit <- pim(formula,data=formatted_data,link = link,model = model,estim=estim)
     coefs <- coef(fit)[paste0(arm,levels[2])]
@@ -327,6 +313,8 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
                       loss=wlt_count["loss"],
                       tie=wlt_count["tie"]
                       )
+  } else {
+    stop("Unrecognised stratification method")
   }
   
   rownames(out) <- NULL
@@ -347,35 +335,6 @@ wins_wrapper <- function(data, outcomes, arm, levels,
                          alpha=0.05
 ){
   
-  # print("ATTEMPTING TO RUN WINS_WRAPPER")
-  # # This needs deleted before pull request to merge with main
-  # trace <- list(data = data,
-  #              outcomes=outcomes,
-  #              arm=arm,
-  #              levels=levels,
-  #              stratum = stratum,
-  #              stratum.weight = stratum.weight,
-  #              covariates = covariates,
-  #              method = method,
-  #              pvalue = "two-sided"
-  #              # alpha = 0.05
-  # )
-  # saveRDS(trace,file="DEBUG_TRACE_INPUTS.RDS")
-  
-  # print(
-  #   list(outcomes=outcomes,
-  #        arm=arm,
-  #        levels=levels,
-  #        stratum = stratum,
-  #        stratum.weight = stratum.weight,
-  #        covariates = covariates,
-  #        method = method,
-  #        pvalue = "two-sided"
-  #        # alpha = 0.05
-  #   )
-  # )
-
-
   # First, we need to convert the data sheet into the correct format
   
   formatted_data <- data.frame(id=1:nrow(data))
@@ -449,71 +408,43 @@ wins_wrapper <- function(data, outcomes, arm, levels,
     Z_t_con <- Z_t_con[which(formatted_data$arm==levels[2]),]
   }
   
+  out <- WINS::win.stat(data = formatted_data,
+                        ep_type = ep_type,
+                        priority = 1:length(outcomes),
+                        arm.name = levels,
+                        tau = tau,
+                        np_direction = np_direction,
+                        Z_t_trt = Z_t_trt,
+                        Z_t_con = Z_t_con, 
+                        method = method,
+                        stratum.weight = stratum.weight,
+                        pvalue = pvalue,
+                        alpha=alpha,
+                        summary.print=FALSE
+  )
   
-  didError <- tryCatch({
-    
-    out <- WINS::win.stat(data = formatted_data,
-                          ep_type = ep_type,
-                          priority = 1:length(outcomes),
-                          arm.name = levels,
-                          tau = tau,
-                          np_direction = np_direction,
-                          Z_t_trt = Z_t_trt,
-                          Z_t_con = Z_t_con, 
-                          method = method,
-                          stratum.weight = stratum.weight,
-                          pvalue = pvalue,
-                          alpha=alpha,
-                          summary.print=FALSE
+  # Format results into a table to report back
+  
+  estimates <- do.call("rbind",lapply(names(out$Win_statistic),function(i){
+    cbind(outcome=i,
+          as.data.frame(matrix(out$Win_statistic[[i]],nrow=1))
     )
-    
-    FALSE
-  }, error=function(e){e})
-
-  if("error" %in% class(didError)){
-    
-    showModal(modalDialog(
-      title="Error",
-      sprintf("%s",didError$message),
-      easyClose=TRUE,
-      footer=NULL
-    ))
-    
-    estimates <- data.frame(outcome=NA,
-                            estimate=NA,
-                            lower=NA,
-                            upper=NA,
-                            p=NA,
-                            win=NA,
-                            loss=NA,
-                            tie=NA)
+  }))
+  
+  colnames(estimates)[-1] <- c("estimate","lower","upper")
+  
+  estimates$p <- c(out$p_value)
+  
+  # Win/loss/tie proportions only make sense to report if unstratified
+  if(length(stratum)==0){
+    estimates$win <- out$Win_prop$P_trt
+    estimates$loss <- out$Win_prop$P_con    
+    estimates$tie <- 1 - (out$Win_prop$P_trt + out$Win_prop$P_con)
     
   } else {
-    
-    # Format results into a table to report back
-    
-    estimates <- do.call("rbind",lapply(names(out$Win_statistic),function(i){
-      cbind(outcome=i,
-            as.data.frame(matrix(out$Win_statistic[[i]],nrow=1))
-      )
-    }))
-    
-    colnames(estimates)[-1] <- c("estimate","lower","upper")
-    
-    estimates$p <- c(out$p_value)
-    
-    # Win/loss/tie proportions only make sense to report if unstratified
-    if(length(stratum)==0){
-      estimates$win <- out$Win_prop$P_trt
-      estimates$loss <- out$Win_prop$P_con    
-      estimates$tie <- 1 - (out$Win_prop$P_trt + out$Win_prop$P_con)
-      
-    } else {
-      estimates$win <- NA
-      estimates$loss <- NA    
-      estimates$tie <- NA
-    }
-    
+    estimates$win <- NA
+    estimates$loss <- NA    
+    estimates$tie <- NA
   }
   
   estimates

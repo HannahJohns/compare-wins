@@ -71,17 +71,7 @@ list(
           uiOutput("DATAANALYSIS__arm_active") # TODO: probably swap this out with something in data import module for formatting stuff
         ),
         fluidRow(
-          bsCollapsePanel("Statistical controls",
-                          fluidPage(
-                            fluidRow(
-                              numericInput("DATAANALYSIS__alpha",label = "Type-I error (α)",
-                                           value = 0.05,min = 0,max = 1,step = 0.01)
-                            )
-                          )
-          )
-        ),
-        fluidRow(
-          bsCollapsePanel("Adjust for Covariates",
+          bsCollapsePanel("Add Stratification/Adjust for Covariates",
           fluidPage(
             uiOutput(
               "DATAANALYSIS__covariates_components"            
@@ -109,6 +99,16 @@ list(
                                              )
                                            )
                            )
+          )
+        ),
+        fluidRow(
+          bsCollapsePanel("Statistical controls",
+                          fluidPage(
+                            fluidRow(
+                              numericInput("DATAANALYSIS__alpha",label = "Type-I error (α)",
+                                           value = 0.05,min = 0,max = 1,step = 0.01)
+                            )
+                          )
           )
         ),
         fluidRow(actionButton("DATAANALYSIS__analysis_go","Analyse!"))
@@ -378,19 +378,41 @@ list(
       
       out <- NULL
 
-      # Only display options if covariates have been added
+      # Only display options if relevant
       covariates_tmp <- DATAANALYSIS__covariates()
       
       if(length(covariates_tmp)>0){
-       out <- selectInput("DATAANALYSIS__covariate_strata_method",
-                          label = "Stratification method",
-                          choices =  c("Maentel-Haenszel"="MH-type",
-                                       "Unstratified"="unstratified",
-                                       "Proportional"="wt.stratum1",
-                                       "Proportional (observed events)"="wt.stratum2",
-                                       "Equal Weights"="equal")
-                          )
+        
+       n_strata <- sum(sapply(covariates_tmp,function(x){x$stratify}))
+       
+       if(n_strata>0){
+         
+         if(input$DATAANALYSIS__method=="wins"){
+           
+           # TODO: Add IVW to WINS wrapper
+           
+           choices <- c("Maentel-Haenszel"="MH-type",
+                        "Unstratified"="unstratified",
+                        "Proportional"="wt.stratum1",
+                        "Proportional (observed events)"="wt.stratum2",
+                        "Equal Weights"="equal")
+         } else {
+           
+           # We should always be able to use inverse variance weighting
+           
+           choices <- c("Inverse Variance Weighting"="ivw",
+                        "Unstratified"="unstratified"
+                        )
+         }
+
+         out <- selectInput("DATAANALYSIS__covariate_strata_method",
+                            label = "Stratification method",
+                            choices = choices
+         )
+         
        }
+       }
+
             
       out
       
@@ -796,6 +818,11 @@ list(
           
           statistical.method <- isolate(input$DATAANALYSIS__method) 
           
+          # Delay showing errors/warnings until after all results are run.
+          errorList <- list()
+          warningList <- list()
+          
+          
           withProgress(message = 'Analysing',detail = "Overall results", value = 0, {
             
             write(sprintf("Running Main Analysis"), stderr())
@@ -812,6 +839,11 @@ list(
                                           alpha = alpha
                                       ),
                                      statistical.method)
+            
+            errorList[[length(errorList)+1]] <- estimate$error
+            warningList[[length(warningList)+1]] <- estimate$warning
+            estimate <- estimate$out
+            
 
             write(sprintf("Done"), stderr())
             
@@ -837,6 +869,11 @@ list(
                                                          alpha = alpha
                                                   ),
                                                   statistical.method)
+                
+                errorList[[length(errorList)+1]] <- estimate_by_outcome$error
+                warningList[[length(warningList)+1]] <- estimate_by_outcome$warning
+                estimate_by_outcome <- estimate_by_outcome$out
+                
 
                 colnames(estimate_by_outcome) <- paste(colnames(estimate_by_outcome))
                 estimate_by_outcome <- cbind(level=i,
@@ -860,6 +897,10 @@ list(
                                                                     alpha = alpha
                                                                 ),
                                                                statistical.method)
+                
+                errorList[[length(errorList)+1]] <- estimate_by_cumulative_outcome$error
+                warningList[[length(warningList)+1]] <- estimate_by_cumulative_outcome$warning
+                estimate_by_cumulative_outcome <- estimate_by_cumulative_outcome$out
 
                 
                 colnames(estimate_by_cumulative_outcome)[-1] <- paste(colnames(estimate_by_cumulative_outcome)[-1],"cumulative",sep="_")
@@ -924,6 +965,11 @@ list(
                                                 ),
                                                 statistical.method)
                 
+                errorList[[length(errorList)+1]] <- strata_estimate$error
+                warningList[[length(warningList)+1]] <- strata_estimate$warning
+                strata_estimate <- strata_estimate$out
+                
+                
                 tmp_decomposed_estimate <- lapply(1:length(outcomes), function(i){NULL})
                 
                 if(length(outcomes)>1){
@@ -942,6 +988,10 @@ list(
                                                               alpha = alpha
                                                         ),
                                                         statistical.method)
+                    
+                    errorList[[length(errorList)+1]] <- estimate_by_outcome$error
+                    warningList[[length(warningList)+1]] <- estimate_by_outcome$warning
+                    estimate_by_outcome <- estimate_by_outcome$out
                       
                     
                     colnames(estimate_by_outcome) <- paste(colnames(estimate_by_outcome))
@@ -961,7 +1011,11 @@ list(
                                                                          method = adjust.method,
                                                                          alpha = alpha
                                                                     ),
-                                                                    "wins")
+                                                                    statistical.method)
+                    
+                    errorList[[length(errorList)+1]] <- estimate_by_cumulative_outcome$error
+                    warningList[[length(warningList)+1]] <- estimate_by_cumulative_outcome$warning
+                    estimate_by_cumulative_outcome <- estimate_by_cumulative_outcome$out
                     
                     colnames(estimate_by_cumulative_outcome)[-1] <- paste(colnames(estimate_by_cumulative_outcome)[-1],"cumulative",sep="_")
                     estimate_by_cumulative_outcome <- cbind(level=i,
@@ -993,6 +1047,49 @@ list(
             
           }) # End with progress
          
+          # TODO: Show modal diagogues here if we had warnings or errors
+          
+          n_errors <- length(errorList)
+          n_warnings <- length(warningList)
+          
+          if(n_errors+n_warnings>0){
+            
+            
+            print(errorList)
+            print(warningList)
+            
+            messageTitle <- ifelse(n_errors>0,"Error","Warning")
+
+            if(n_errors>0){
+              errorText <-  table(sapply(errorList,function(x){x$message}))
+              errorText <- sapply(1:length(errorText),function(i){sprintf("<b>%d Error%s:</b> %s",errorText[i],ifelse(errorText[i]>1,"s",""), names(errorText)[i])})
+              errorText <- paste(errorText,collapse="<br>")
+            } else {
+              errorText <- ""
+            }
+            
+            if(n_warnings>0){
+              warningText <-  table(sapply(warningList,function(x){x$message}))
+              warningText <- sapply(1:length(warningText),function(i){sprintf("<b>%d Warning%s:</b> %s",warningText[i],ifelse(warningText[i]>1,"s",""), names(warningText)[i])})
+              warningText <- paste(warningText,collapse="<br>")
+            } else {
+              warningText <- ""
+            }
+            
+            text <- sprintf("%s%s%s",
+                            errorText,
+                            ifelse(n_errors>0 & n_warnings>0, "<br>",""),
+                            warningText
+                            )
+            
+            showModal(modalDialog(
+                  title=messageTitle,
+                  HTML(text),
+                  easyClose=TRUE,
+                  footer=NULL
+            ))
+            
+          }
           
           out <- list(estimate=estimate,decomposed_estimate=decomposed_estimate,estimates_by_stratum=estimates_by_stratum)
           
