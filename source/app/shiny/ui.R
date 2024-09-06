@@ -24,11 +24,12 @@ ui <- fluidPage(
   )),
 
   # Application title
-  titlePanel("Generalised Pairwise Comparisons"),
+  titlePanel("COMPARE WINS"),
   
   # UI is constructed recursively based on some root module
   do.call("tabsetPanel",construct_tabset_ui("R/module-ROOT")),
   
   fluidRow(hr()),
   fluidRow("Version 0.2.0")
+  
 )

@@ -124,19 +124,22 @@ list(
                                             )
                               ),
                               # TODO: Need to add options here
-                              conditionalPanel("input.DATAANALYSIS__pim_estimator=='estimator.nleqslv'",
-                                               fluidRow(
-                                               "NLEQSV solver arguments here"
-                                               )
-                              ),
-                              conditionalPanel("input.DATAANALYSIS__pim_estimator=='estimator.glm'",
-                                               fluidRow(
-                                                 "GLM solver arguments here"
-                                               )
-                              ),
+                              # conditionalPanel("input.DATAANALYSIS__pim_estimator=='estimator.nleqslv'",
+                              #                  fluidRow(
+                              #                  "NLEQSV solver arguments here"
+                              #                  )
+                              # ),
+                              # conditionalPanel("input.DATAANALYSIS__pim_estimator=='estimator.glm'",
+                              #                  fluidRow(
+                              #                    "GLM solver arguments here"
+                              #                  )
+                              # ),
                               conditionalPanel("input.DATAANALYSIS__pim_estimator=='estimator.BB'",
                                                fluidRow(
-                                                 "BB solver arguments here"
+                                                 numericInput("DATAANALYSIS__pim_estimator_max_iter",
+                                                              label = "Maximum iterations",
+                                                              value = 1500
+                                                              )
                                                )
                               )
                             ) # End PIM controls
