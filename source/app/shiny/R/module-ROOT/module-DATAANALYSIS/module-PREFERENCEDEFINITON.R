@@ -14,7 +14,8 @@ list(
                              });"),
     fluidRow(
       radioButtons("PREFDEF__preferenceType", "Preferences are based on:",
-                   choices = c("Heirarchy" = "heirarchical") #, "List" = "list")
+                   choices = c("Heirarchy" = "heirarchical",
+                               "List" = "list")
       )
     ),
     fluidRow(
@@ -43,10 +44,14 @@ list(
                                 }
                                 
                                 # actually read the file
-                                data <- read.csv(file = input$PREFDEF__preference_file$datapath)
+                                data <- read.csv(
+                                                 file = input$PREFDEF__preference_file$datapath
+                                                 )
                                 
                                 # Any auto cleaning should go here
+                                rownames(data) <- NULL
                                 
+                                data
                               })
     
     
@@ -296,9 +301,23 @@ list(
           )
         }
       } else {
+        
+        data <- PREFDEF__preference_sheet()
+        
+        #TODO: At present, we assume that we merge works properly.
+        # We need to add the following:
+        
+        # 1. Need to add selection to provide links across each preference
+        # 2. Need to add a pre-check for any values in the data sheet that
+        #    aren't in the preference list
+        
         out <- sidebarLayout(
           sidebarPanel(
-            fileInput("PREFDEF__preference_file","Select a file") 
+            fileInput("PREFDEF__preference_file","Select a file"),
+            selectInput("PREFDEF__preference_rank",
+                        label = "Rank column",
+                        choices = colnames(data)
+                        )
           ),
           mainPanel(
             DT::dataTableOutput("PREFDEF__tbl")

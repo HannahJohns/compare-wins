@@ -81,8 +81,14 @@ run_analysis <- function(args, method){
       
     } else if (method=="pim"){
       
-      warning("Currently no way to specify estimator")
-      
+      if(args$estimator_method=="estimator.BB"){
+        controlList <- list(maxit = args$max_iter)
+      } else if(args$estimator_method=="estimator.glm") {
+        controlList <- list(maxit = args$max_iter)
+      } else {
+        controlList <- NULL
+      }
+
       out <- pim_wrapper(data=args$data,
                          outcomes=args$outcomes,
                          arm=args$arm,
@@ -90,7 +96,10 @@ run_analysis <- function(args, method){
                          stratum=args$stratum,
                          covariates=args$covariates_effect,
                          stratum.weight = args$stratum.weight,
-                         alpha=args$alpha)
+                         alpha=args$alpha,
+                         estim = args$estimator_method,
+                         controlList = controlList
+                         )
       
     } else if(method=="debug"){
       
@@ -130,15 +139,15 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
                          stratum=NULL,
                          covariates=NULL,
                          stratum.weight="ivw",
-                         alpha=0.05
+                         alpha=0.05,
+                         estim,
+                         controlList = NULL
                          ){
   
   # This should ultimately be arguments the user can make
   link <- "logit"
   model  <- "difference"
-  estim <- "estimator.nleqslv" # ?estimators
 
-    
   # Get data into the correct structure
   
   # Reasonably easy to get the RHS of the regression model working
@@ -255,7 +264,11 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
   if(stratum.weight=="ivw"){
 
     fit <- by(formatted_data,stratum, function(tmpdf){
-      pim(formula,data=tmpdf,link = link,model = model,estim=estim)
+      pim(formula,
+          data=tmpdf,
+          link = link,
+          model = model,
+          estim=estim)
     })
     
     fit <- do.call("rbind",lapply(fit,function(x){
@@ -288,7 +301,15 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
     
   } else if (stratum.weight=="unstratified"){
     
-    fit <- pim(formula,data=formatted_data,link = link,model = model,estim=estim)
+    
+    fit <- pim(formula,
+               data=formatted_data,
+               link = link,
+               model = model,
+               estim=estim,
+               control=controlList
+    )
+    
     coefs <- coef(fit)[paste0(arm,levels[2])]
     conf_interval <- confint(fit,level = 1-alpha)[paste0(arm,levels[2]),]
     pval <- summary(fit)@pr[paste0(arm,levels[2])]
@@ -377,8 +398,7 @@ wins_wrapper <- function(data, outcomes, arm, levels,
           )
         ) >0 ){
           
-          # should be a pop-up but can't see it at present
-          write(sprintf(
+          warning(sprintf(
             "%s includes values other than 1 and 0. All values not 1 assumed censored.",
             outcomes[[i]]$var
           ), stderr())

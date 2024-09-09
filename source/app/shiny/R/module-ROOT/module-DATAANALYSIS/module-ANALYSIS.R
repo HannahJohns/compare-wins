@@ -134,7 +134,7 @@ list(
                               #                    "GLM solver arguments here"
                               #                  )
                               # ),
-                              conditionalPanel("input.DATAANALYSIS__pim_estimator=='estimator.BB'",
+                              conditionalPanel("input.DATAANALYSIS__pim_estimator=='estimator.BB' || input.DATAANALYSIS__pim_estimator=='estimator.glm'|",
                                                fluidRow(
                                                  numericInput("DATAANALYSIS__pim_estimator_max_iter",
                                                               label = "Maximum iterations",
@@ -858,7 +858,7 @@ list(
           errorList <- list()
           warningList <- list()
           
-          
+      
           withProgress(message = 'Analysing',detail = "Overall results", value = 0, {
             
             write(sprintf("Running Main Analysis"), stderr())
@@ -872,7 +872,9 @@ list(
                                           covariates_effect = covariates_effect,
                                           covariates_censor = covariates_censor,
                                           method = adjust.method,
-                                          alpha = alpha
+                                          alpha = alpha,
+                                          estimator_method = isolate(input$DATAANALYSIS__pim_estimator),
+                                          max_iter = isolate(input$DATAANALYSIS__pim_estimator_max_iter)
                                       ),
                                      statistical.method)
             
@@ -902,7 +904,9 @@ list(
                                                          covariates_effect = covariates_effect,
                                                          covariates_censor = covariates_censor,
                                                          method = adjust.method,
-                                                         alpha = alpha
+                                                         alpha = alpha,
+                                                         estimator_method = isolate(input$DATAANALYSIS__pim_estimator),
+                                                         max_iter = isolate(input$DATAANALYSIS__pim_estimator_max_iter)
                                                   ),
                                                   statistical.method)
                 
@@ -930,7 +934,9 @@ list(
                                                                     covariates_effect = covariates_effect,
                                                                     covariates_censor = covariates_censor,
                                                                     method = adjust.method,
-                                                                    alpha = alpha
+                                                                    alpha = alpha,
+                                                                    estimator_method = isolate(input$DATAANALYSIS__pim_estimator),
+                                                                    max_iter = isolate(input$DATAANALYSIS__pim_estimator_max_iter)
                                                                 ),
                                                                statistical.method)
                 
@@ -997,7 +1003,9 @@ list(
                                                       covariates_effect = covariates_effect,
                                                       covariates_censor = covariates_censor,
                                                       method = adjust.method,
-                                                      alpha = alpha
+                                                      alpha = alpha,
+                                                      estimator_method = isolate(input$DATAANALYSIS__pim_estimator),
+                                                      max_iter = isolate(input$DATAANALYSIS__pim_estimator_max_iter)
                                                 ),
                                                 statistical.method)
                 
@@ -1021,7 +1029,9 @@ list(
                                                               covariates_effect = covariates_effect,
                                                               covariates_censor = covariates_censor,
                                                               method = adjust.method,
-                                                              alpha = alpha
+                                                              alpha = alpha,
+                                                              estimator_method = isolate(input$DATAANALYSIS__pim_estimator),
+                                                              max_iter = isolate(input$DATAANALYSIS__pim_estimator_max_iter)
                                                         ),
                                                         statistical.method)
                     
@@ -1045,7 +1055,9 @@ list(
                                                                          covariates_effect = covariates_effect,
                                                                          covariates_censor = covariates_censor,
                                                                          method = adjust.method,
-                                                                         alpha = alpha
+                                                                         alpha = alpha,
+                                                                         estimator_method = isolate(input$DATAANALYSIS__pim_estimator),
+                                                                         max_iter = isolate(input$DATAANALYSIS__pim_estimator_max_iter)
                                                                     ),
                                                                     statistical.method)
                     
@@ -1129,7 +1141,27 @@ list(
           
           out <- list(estimate=estimate,decomposed_estimate=decomposed_estimate,estimates_by_stratum=estimates_by_stratum)
           
-        } # End If Hierarchical
+        } else if( isolate(input$SYMBOLIC_LINK__preferenceType)=="list" ){
+        
+          browser()
+          
+          # The easiest way to make this work is to add it as a new variable in
+          # the data sheet and then go from there
+          
+          
+          
+          
+          
+          out <- list(estimate=estimate,
+                      decomposed_estimate=NULL,
+                      estimates_by_stratum=estimates_by_stratum)
+          
+        } else {
+          
+          stop("Unspecified method used")
+          
+          
+        } # End outcome method
         
         
         
