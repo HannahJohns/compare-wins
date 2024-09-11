@@ -16,13 +16,13 @@
 # This is a test of some code:
 # https://stackoverflow.com/questions/51621348/r-shiny-store-the-user-input-from-multiple-dynamically-generated-textareainput-f/51622007#51622007
 
-
 list(
   module_name = "DATAANALYSIS",
   module_label = "Data Analysis",
   imports=c("DATAIMPORT__data_sheet"="SYMBOLIC_LINK__data_sheet",
             "PREFDEF__preference_export"="SYMBOLIC_LINK__preference_export",
-            "PREFDEF__preferenceType"="SYMBOLIC_LINK__preferenceType"
+            "PREFDEF__preferenceType"="SYMBOLIC_LINK__preferenceType",
+            "PREFDEF__preference_rank"="SYMBOLIC_LINK__preference_rank"
             ),
   ui_element = sidebarLayout(
     sidebarPanel(
@@ -791,386 +791,549 @@ list(
 
       out <- NULL
       if(!is.null(arm)){
-        # TODO: At present, this only supports heirarchical output.
-        # This needs fixed for use with e.g. PIM
+
+        
+        # Set up any inputs we want to reference/transform/etc
         
         alpha <- isolate(input$DATAANALYSIS__alpha)
+        
+        levels <- isolate(input$DATAANALYSIS__arm_active_selectInput)
+        levels <- c(
+          levels,
+          setdiff(levels(as.factor(data_sheet[,arm])),levels)
+        )
+        
+        preference.method <- isolate(input$SYMBOLIC_LINK__preferenceType)
+        statistical.method <- isolate(input$DATAANALYSIS__method) 
+        
+        if(is.null(isolate(input$DATAANALYSIS__covariate_strata_method))){
+          stratum.weight <- "unstratified"
+        } else {
+          stratum.weight <- isolate(input$DATAANALYSIS__covariate_strata_method)
+        }
+        
+        if(is.null(isolate(input$DATAANALYSIS__surv_covariate_strata_method))){
+          adjust.method <- "unadjusted"
+        } else {
+          adjust.method <- isolate(input$DATAANALYSIS__surv_covariate_strata_method)
+        }
+        
+        estimator_method <- isolate(input$DATAANALYSIS__pim_estimator)
+        
+        max_iter <- isolate(input$DATAANALYSIS__pim_estimator_max_iter)
 
-        if(isolate(input$SYMBOLIC_LINK__preferenceType)=="heirarchical"){
+        
+        
+        # All methods should should show a progress bar
+        
+        # Delay showing errors/warnings until after all results are run.
+        errorList <- list()
+        warningList <- list()
+        
 
+        withProgress(message = 'Analysing',detail = "Overall results", value = 0, {
+        
+          
+        ### Analysis loop (heirarchy-based) --------------    
+        if(preference.method=="heirarchical"){
+          
           outcomes <- preferences$heirarchical
-
-          levels <- isolate(input$DATAANALYSIS__arm_active_selectInput)
-          levels <- c(
-            levels,
-            setdiff(levels(as.factor(data_sheet[,arm])),levels)
-          )
-
-          # Set up out objects and get total runs for progress bar
-      
+          
+          # Set up progress bar total runs for progress bar
+          
           total_run <- 1 # Main results
-      
+          
           if(length(outcomes)>1){
             decomposed_estimate <- lapply(1:length(outcomes), function(i){NULL})
-      
+            
             total_run <- total_run + 2*length(outcomes) # Run once for individual and once for cumulative
-      
+            
           } else {
             decomposed_estimate <- NULL
           }
-      
-
+          
+          
           if(n_strata>0){
             if(length(outcomes)>1){
-
+              
               estimates_by_stratum <- lapply(1:n_strata, function(i){NULL})
-
+              
               total_run <- total_run + n_strata*(1+2*length(outcomes))
-
+              
             } else {
-
+              
               estimates_by_stratum <- lapply(1:n_strata, function(i){NULL})
-
+              
               total_run <- total_run + n_strata
-
+              
             }
-
+            
           } else {
             estimates_by_stratum <- NULL
           }
           
           
-          if(is.null(isolate(input$DATAANALYSIS__covariate_strata_method))){
-            stratum.weight <- "unstratified"
-          } else {
-            stratum.weight <- isolate(input$DATAANALYSIS__covariate_strata_method)
-          }
+          write(sprintf("Running Main Analysis"), stderr())
           
-          if(is.null(isolate(input$DATAANALYSIS__surv_covariate_strata_method))){
-            adjust.method <- "unadjusted"
-          } else {
-            adjust.method <- isolate(input$DATAANALYSIS__surv_covariate_strata_method)
-          }
+          estimate <- run_analysis(list(data = data_sheet,
+                                        outcomes=outcomes,
+                                        arm=arm,
+                                        levels=levels,
+                                        stratum = stratum,
+                                        stratum.weight = stratum.weight,
+                                        covariates_effect = covariates_effect,
+                                        covariates_censor = covariates_censor,
+                                        method = adjust.method,
+                                        alpha = alpha,
+                                        estimator_method = estimator_method,
+                                        max_iter = max_iter
+          ),
+          statistical.method)
           
-          statistical.method <- isolate(input$DATAANALYSIS__method) 
+          errorList[[length(errorList)+1]] <- estimate$error
+          warningList[[length(warningList)+1]] <- estimate$warning
+          estimate <- estimate$out
           
-          # Delay showing errors/warnings until after all results are run.
-          errorList <- list()
-          warningList <- list()
+          write(sprintf("Done"), stderr())
           
-      
-          withProgress(message = 'Analysing',detail = "Overall results", value = 0, {
+          # Get decomposition of results by outcome facets
+          if(length(outcomes)>1){
             
-            write(sprintf("Running Main Analysis"), stderr())
-
-            estimate <- run_analysis(list(data = data_sheet,
-                                          outcomes=outcomes,
-                                          arm=arm,
-                                          levels=levels,
-                                          stratum = stratum,
-                                          stratum.weight = stratum.weight,
-                                          covariates_effect = covariates_effect,
-                                          covariates_censor = covariates_censor,
-                                          method = adjust.method,
-                                          alpha = alpha,
-                                          estimator_method = isolate(input$DATAANALYSIS__pim_estimator),
-                                          max_iter = isolate(input$DATAANALYSIS__pim_estimator_max_iter)
-                                      ),
-                                     statistical.method)
-            
-            errorList[[length(errorList)+1]] <- estimate$error
-            warningList[[length(warningList)+1]] <- estimate$warning
-            estimate <- estimate$out
-            
-
-            write(sprintf("Done"), stderr())
-            
-            # Get decomposition of results by outcome facets
-            if(length(outcomes)>1){
-            
-              write(sprintf("Decomposing outcomes by facets"), stderr())  
-              for(i in 1:length(outcomes)){
-                
-                write(sprintf("Facet %d",i), stderr())  
-                
-                incProgress(1/total_run,detail = sprintf("Component %d..",i))
-                
-                estimate_by_outcome <- run_analysis(list(data = data_sheet,
-                                                         outcomes=outcomes[i],
-                                                         arm=arm,
-                                                         levels=levels,
-                                                         stratum = stratum,
-                                                         stratum.weight = stratum.weight,
-                                                         covariates_effect = covariates_effect,
-                                                         covariates_censor = covariates_censor,
-                                                         method = adjust.method,
-                                                         alpha = alpha,
-                                                         estimator_method = isolate(input$DATAANALYSIS__pim_estimator),
-                                                         max_iter = isolate(input$DATAANALYSIS__pim_estimator_max_iter)
-                                                  ),
-                                                  statistical.method)
-                
-                errorList[[length(errorList)+1]] <- estimate_by_outcome$error
-                warningList[[length(warningList)+1]] <- estimate_by_outcome$warning
-                estimate_by_outcome <- estimate_by_outcome$out
-                
-
-                colnames(estimate_by_outcome) <- paste(colnames(estimate_by_outcome))
-                estimate_by_outcome <- cbind(level=i,
-                                             level_var=outcomes[[i]]$var,
-                                             estimate_by_outcome)
-                
-                write(sprintf("Done"), stderr())  
-                write(sprintf("Facets 1 to %d",i), stderr())  
-                
-                incProgress(1/total_run,detail = sprintf("Component %d...",i))
-                
-                estimate_by_cumulative_outcome <- run_analysis(list(data = data_sheet,
-                                                                    outcomes=outcomes[1:i],
-                                                                    arm=arm,
-                                                                    levels=levels,
-                                                                    stratum = stratum,
-                                                                    stratum.weight = stratum.weight,
-                                                                    covariates_effect = covariates_effect,
-                                                                    covariates_censor = covariates_censor,
-                                                                    method = adjust.method,
-                                                                    alpha = alpha,
-                                                                    estimator_method = isolate(input$DATAANALYSIS__pim_estimator),
-                                                                    max_iter = isolate(input$DATAANALYSIS__pim_estimator_max_iter)
-                                                                ),
-                                                               statistical.method)
-                
-                errorList[[length(errorList)+1]] <- estimate_by_cumulative_outcome$error
-                warningList[[length(warningList)+1]] <- estimate_by_cumulative_outcome$warning
-                estimate_by_cumulative_outcome <- estimate_by_cumulative_outcome$out
-
-                
-                colnames(estimate_by_cumulative_outcome)[-1] <- paste(colnames(estimate_by_cumulative_outcome)[-1],"cumulative",sep="_")
-                estimate_by_cumulative_outcome <- cbind(level=i,
-                                                        level_var=outcomes[[i]]$var,
-                                                        estimate_by_cumulative_outcome)
-                
-                write(sprintf("Done"), stderr())  
-                write(sprintf("Facets 1 to %d",i), stderr())  
-                
-                decomposed_estimate[[i]] <- left_join(
-                  estimate_by_outcome,
-                  estimate_by_cumulative_outcome,
-                ) %>% arrange(outcome,level)
-                
-              }
+            write(sprintf("Decomposing outcomes by facets"), stderr())  
+            for(i in 1:length(outcomes)){
               
-              decomposed_estimate <- do.call("rbind",decomposed_estimate)
-            } # End if decompose at top level
-            
-            
-            if(n_strata>0){
+              write(sprintf("Facet %d",i), stderr())  
+              
+              incProgress(1/total_run,detail = sprintf("Component %d..",i))
+              
+              estimate_by_outcome <- run_analysis(list(data = data_sheet,
+                                                       outcomes=outcomes[i],
+                                                       arm=arm,
+                                                       levels=levels,
+                                                       stratum = stratum,
+                                                       stratum.weight = stratum.weight,
+                                                       covariates_effect = covariates_effect,
+                                                       covariates_censor = covariates_censor,
+                                                       method = adjust.method,
+                                                       alpha = alpha,
+                                                       estimator_method = estimator_method,
+                                                       max_iter = max_iter
+              ),
+              statistical.method)
+              
+              errorList[[length(errorList)+1]] <- estimate_by_outcome$error
+              warningList[[length(warningList)+1]] <- estimate_by_outcome$warning
+              estimate_by_outcome <- estimate_by_outcome$out
               
               
-              if(length(stratum)==1){
-                strata_column <- data_sheet[,stratum]
-              } else {
-                strata_column <-apply(data_sheet[,stratum],1,paste)
-              }
+              colnames(estimate_by_outcome) <- paste(colnames(estimate_by_outcome))
+              estimate_by_outcome <- cbind(level=i,
+                                           level_var=outcomes[[i]]$var,
+                                           estimate_by_outcome)
               
-
-
-              stratified_data_sheet <- by(data = data_sheet,
-                                          INDICES = strata_column,
-                                          function(x){x}
-              )
+              write(sprintf("Done"), stderr())  
+              write(sprintf("Facets 1 to %d",i), stderr())  
+              
+              incProgress(1/total_run,detail = sprintf("Component %d...",i))
+              
+              estimate_by_cumulative_outcome <- run_analysis(list(data = data_sheet,
+                                                                  outcomes=outcomes[1:i],
+                                                                  arm=arm,
+                                                                  levels=levels,
+                                                                  stratum = stratum,
+                                                                  stratum.weight = stratum.weight,
+                                                                  covariates_effect = covariates_effect,
+                                                                  covariates_censor = covariates_censor,
+                                                                  method = adjust.method,
+                                                                  alpha = alpha,
+                                                                  estimator_method = estimator_method,
+                                                                  max_iter = max_iter
+              ),
+              statistical.method)
+              
+              errorList[[length(errorList)+1]] <- estimate_by_cumulative_outcome$error
+              warningList[[length(warningList)+1]] <- estimate_by_cumulative_outcome$warning
+              estimate_by_cumulative_outcome <- estimate_by_cumulative_outcome$out
               
               
-              # This is incredibly dumb but it will work
-              strata_values <- by(data = data.frame(strata_column=strata_column),
-                                  INDICES = strata_column,
-                                  function(x){unique(x$strata_column)}
-              )
+              colnames(estimate_by_cumulative_outcome)[-1] <- paste(colnames(estimate_by_cumulative_outcome)[-1],"cumulative",sep="_")
+              estimate_by_cumulative_outcome <- cbind(level=i,
+                                                      level_var=outcomes[[i]]$var,
+                                                      estimate_by_cumulative_outcome)
               
-              for(j in 1:length(stratified_data_sheet)){
-                
-                
-                incProgress(1/total_run,detail = sprintf("Strata %d",j))
-                
-                strata_val <- strata_values[[j]]
-                
-                strata_estimate <-  run_analysis(list(data = stratified_data_sheet[[j]],
-                                                      outcomes=outcomes,
-                                                      arm=arm,
-                                                      levels=levels,
-                                                      stratum = stratum,
-                                                      stratum.weight = stratum.weight,
-                                                      covariates_effect = covariates_effect,
-                                                      covariates_censor = covariates_censor,
-                                                      method = adjust.method,
-                                                      alpha = alpha,
-                                                      estimator_method = isolate(input$DATAANALYSIS__pim_estimator),
-                                                      max_iter = isolate(input$DATAANALYSIS__pim_estimator_max_iter)
-                                                ),
-                                                statistical.method)
-                
-                errorList[[length(errorList)+1]] <- strata_estimate$error
-                warningList[[length(warningList)+1]] <- strata_estimate$warning
-                strata_estimate <- strata_estimate$out
-                
-                
-                tmp_decomposed_estimate <- lapply(1:length(outcomes), function(i){NULL})
-                
-                if(length(outcomes)>1){
-                  for(i in 1:length(outcomes)){
-                    
-                    incProgress(1/total_run,detail = sprintf("Strata %d Component %d..",j,i))
-                    estimate_by_outcome <-  run_analysis(list(data = stratified_data_sheet[[j]],
-                                                              outcomes=outcomes[i],
-                                                              arm=arm,
-                                                              levels=levels,
-                                                              stratum = stratum,
-                                                              stratum.weight = stratum.weight,
-                                                              covariates_effect = covariates_effect,
-                                                              covariates_censor = covariates_censor,
-                                                              method = adjust.method,
-                                                              alpha = alpha,
-                                                              estimator_method = isolate(input$DATAANALYSIS__pim_estimator),
-                                                              max_iter = isolate(input$DATAANALYSIS__pim_estimator_max_iter)
-                                                        ),
-                                                        statistical.method)
-                    
-                    errorList[[length(errorList)+1]] <- estimate_by_outcome$error
-                    warningList[[length(warningList)+1]] <- estimate_by_outcome$warning
-                    estimate_by_outcome <- estimate_by_outcome$out
-                      
-                    
-                    colnames(estimate_by_outcome) <- paste(colnames(estimate_by_outcome))
-                    estimate_by_outcome <- cbind(level=i,
-                                                 level_var=outcomes[[i]]$var,
-                                                 estimate_by_outcome)
-                    
-                    incProgress(1/total_run,detail = sprintf("Strata %d Component %d...",j,i))
-                    estimate_by_cumulative_outcome <-  run_analysis(list(data = stratified_data_sheet[[j]],
-                                                                         outcomes=outcomes[1:i],
-                                                                         arm=arm,
-                                                                         levels=levels,
-                                                                         stratum = stratum,
-                                                                         stratum.weight = stratum.weight,
-                                                                         covariates_effect = covariates_effect,
-                                                                         covariates_censor = covariates_censor,
-                                                                         method = adjust.method,
-                                                                         alpha = alpha,
-                                                                         estimator_method = isolate(input$DATAANALYSIS__pim_estimator),
-                                                                         max_iter = isolate(input$DATAANALYSIS__pim_estimator_max_iter)
-                                                                    ),
-                                                                    statistical.method)
-                    
-                    errorList[[length(errorList)+1]] <- estimate_by_cumulative_outcome$error
-                    warningList[[length(warningList)+1]] <- estimate_by_cumulative_outcome$warning
-                    estimate_by_cumulative_outcome <- estimate_by_cumulative_outcome$out
-                    
-                    colnames(estimate_by_cumulative_outcome)[-1] <- paste(colnames(estimate_by_cumulative_outcome)[-1],"cumulative",sep="_")
-                    estimate_by_cumulative_outcome <- cbind(level=i,
-                                                            level_var=outcomes[[i]]$var,
-                                                            estimate_by_cumulative_outcome)
-                    
-                    # THE INDEX IS WRONG HERE!!!!!!
-                    
-                    tmp_decomposed_estimate[[i]] <- left_join(
-                      estimate_by_outcome,
-                      estimate_by_cumulative_outcome
-                    ) %>% arrange(outcome,level)
-                    
-                  }
+              write(sprintf("Done"), stderr())  
+              write(sprintf("Facets 1 to %d",i), stderr())  
+              
+              decomposed_estimate[[i]] <- left_join(
+                estimate_by_outcome,
+                estimate_by_cumulative_outcome,
+              ) %>% arrange(outcome,level)
+              
+            }
+            
+            decomposed_estimate <- do.call("rbind",decomposed_estimate)
+          } # End if decompose at top level
+          
+          
+          if(n_strata>0){
+            
+            
+            if(length(stratum)==1){
+              strata_column <- data_sheet[,stratum]
+            } else {
+              strata_column <-apply(data_sheet[,stratum],1,paste)
+            }
+            
+            
+            
+            stratified_data_sheet <- by(data = data_sheet,
+                                        INDICES = strata_column,
+                                        function(x){x}
+            )
+            
+            
+            # This is incredibly dumb but it will work
+            strata_values <- by(data = data.frame(strata_column=strata_column),
+                                INDICES = strata_column,
+                                function(x){unique(x$strata_column)}
+            )
+            
+            for(j in 1:length(stratified_data_sheet)){
+              
+              
+              incProgress(1/total_run,detail = sprintf("Strata %d",j))
+              
+              strata_val <- strata_values[[j]]
+              
+              strata_estimate <-  run_analysis(list(data = stratified_data_sheet[[j]],
+                                                    outcomes=outcomes,
+                                                    arm=arm,
+                                                    levels=levels,
+                                                    stratum = stratum,
+                                                    stratum.weight = stratum.weight,
+                                                    covariates_effect = covariates_effect,
+                                                    covariates_censor = covariates_censor,
+                                                    method = adjust.method,
+                                                    alpha = alpha,
+                                                    estimator_method = estimator_method,
+                                                    max_iter = max_iter
+              ),
+              statistical.method)
+              
+              errorList[[length(errorList)+1]] <- strata_estimate$error
+              warningList[[length(warningList)+1]] <- strata_estimate$warning
+              strata_estimate <- strata_estimate$out
+              
+              
+              tmp_decomposed_estimate <- lapply(1:length(outcomes), function(i){NULL})
+              
+              if(length(outcomes)>1){
+                for(i in 1:length(outcomes)){
                   
-                  tmp_decomposed_estimate <- do.call("rbind",tmp_decomposed_estimate)
+                  incProgress(1/total_run,detail = sprintf("Strata %d Component %d..",j,i))
+                  estimate_by_outcome <-  run_analysis(list(data = stratified_data_sheet[[j]],
+                                                            outcomes=outcomes[i],
+                                                            arm=arm,
+                                                            levels=levels,
+                                                            stratum = stratum,
+                                                            stratum.weight = stratum.weight,
+                                                            covariates_effect = covariates_effect,
+                                                            covariates_censor = covariates_censor,
+                                                            method = adjust.method,
+                                                            alpha = alpha,
+                                                            estimator_method = estimator_method,
+                                                            max_iter = max_iter
+                  ),
+                  statistical.method)
                   
-                } else {
-                  tmp_decomposed_estimate <- NULL
+                  errorList[[length(errorList)+1]] <- estimate_by_outcome$error
+                  warningList[[length(warningList)+1]] <- estimate_by_outcome$warning
+                  estimate_by_outcome <- estimate_by_outcome$out
+                  
+                  
+                  colnames(estimate_by_outcome) <- paste(colnames(estimate_by_outcome))
+                  estimate_by_outcome <- cbind(level=i,
+                                               level_var=outcomes[[i]]$var,
+                                               estimate_by_outcome)
+                  
+                  incProgress(1/total_run,detail = sprintf("Strata %d Component %d...",j,i))
+                  estimate_by_cumulative_outcome <-  run_analysis(list(data = stratified_data_sheet[[j]],
+                                                                       outcomes=outcomes[1:i],
+                                                                       arm=arm,
+                                                                       levels=levels,
+                                                                       stratum = stratum,
+                                                                       stratum.weight = stratum.weight,
+                                                                       covariates_effect = covariates_effect,
+                                                                       covariates_censor = covariates_censor,
+                                                                       method = adjust.method,
+                                                                       alpha = alpha,
+                                                                       estimator_method = estimator_method,
+                                                                       max_iter = max_iter
+                  ),
+                  statistical.method)
+                  
+                  errorList[[length(errorList)+1]] <- estimate_by_cumulative_outcome$error
+                  warningList[[length(warningList)+1]] <- estimate_by_cumulative_outcome$warning
+                  estimate_by_cumulative_outcome <- estimate_by_cumulative_outcome$out
+                  
+                  colnames(estimate_by_cumulative_outcome)[-1] <- paste(colnames(estimate_by_cumulative_outcome)[-1],"cumulative",sep="_")
+                  estimate_by_cumulative_outcome <- cbind(level=i,
+                                                          level_var=outcomes[[i]]$var,
+                                                          estimate_by_cumulative_outcome)
+                  
+                  # THE INDEX IS WRONG HERE!!!!!!
+                  
+                  tmp_decomposed_estimate[[i]] <- left_join(
+                    estimate_by_outcome,
+                    estimate_by_cumulative_outcome
+                  ) %>% arrange(outcome,level)
+                  
                 }
                 
-                estimates_by_stratum[[j]] <- list(strata_val = strata_val,
-                                                  estimate=strata_estimate,
-                                                  decomposed_estimate=tmp_decomposed_estimate)
+                tmp_decomposed_estimate <- do.call("rbind",tmp_decomposed_estimate)
                 
-              } # End for strata
+              } else {
+                tmp_decomposed_estimate <- NULL
+              }
               
-            } # End if strata
+              estimates_by_stratum[[j]] <- list(strata_val = strata_val,
+                                                estimate=strata_estimate,
+                                                decomposed_estimate=tmp_decomposed_estimate)
+              
+            } # End for strata
             
-          }) # End with progress
+          } # End if strata
+          
+          out <- list(estimate=estimate,
+                      decomposed_estimate=decomposed_estimate,
+                      estimates_by_stratum=estimates_by_stratum)
+        
+          
          
-          # TODO: Show modal diagogues here if we had warnings or errors
+        ### Analysis loop (list-based) --------------
+        } else if (preference.method=="list"){
           
-          n_errors <- length(errorList)
-          n_warnings <- length(warningList)
           
-          if(n_errors+n_warnings>0){
-            
-            
-            print(errorList)
-            print(warningList)
-            
-            messageTitle <- ifelse(n_errors>0,"Error","Warning")
+          # Overall
+          # tmp <- readRDS("source/app/shiny/tmp_2820d72e098f4423088ed180f06dbefd.RDS")
+          # Strata 0  
+          # tmp <- readRDS("source/app/shiny/tmp_6a496e188ff8818878c82d6087c3ef66.RDS")
+          
+          # Strata 1
+          # tmp <- readRDS("source/app/shiny/tmp_7fca5730e8bec90ae36300623297c155.RDS")
+          
+          # attach(tmp)
 
-            if(n_errors>0){
-              errorText <-  table(sapply(errorList,function(x){x$message}))
-              errorText <- sapply(1:length(errorText),function(i){sprintf("<b>%d Error%s:</b> %s",errorText[i],ifelse(errorText[i]>1,"s",""), names(errorText)[i])})
-              errorText <- paste(errorText,collapse="<br>")
-            } else {
-              errorText <- ""
-            }
-            
-            if(n_warnings>0){
-              warningText <-  table(sapply(warningList,function(x){x$message}))
-              warningText <- sapply(1:length(warningText),function(i){sprintf("<b>%d Warning%s:</b> %s",warningText[i],ifelse(warningText[i]>1,"s",""), names(warningText)[i])})
-              warningText <- paste(warningText,collapse="<br>")
-            } else {
-              warningText <- ""
-            }
-            
-            text <- sprintf("%s%s%s",
-                            errorText,
-                            ifelse(n_errors>0 & n_warnings>0, "<br>",""),
-                            warningText
-                            )
-            
-            showModal(modalDialog(
-                  title=messageTitle,
-                  HTML(text),
-                  easyClose=TRUE,
-                  footer=NULL
-            ))
-            
+          # statistical.method <- "wins"
+          # adjust.method <- method
+          # data_sheet <- data
+          
+          
+          
+          
+          
+          # The easiest way to get list-based analysis working is to treat it
+          # like it's heirarchical with only a single facet.
+          
+          rankName <- isolate(input$SYMBOLIC_LINK__preference_rank)
+
+          # If rankName is already in the data sheet, we need to rename the variable prior to joining
+
+          newRankName <- rankName
+          rename_attempts <- 0
+          while(newRankName %in% colnames(data_sheet)){
+            rename_attempts <- rename_attempts+1
+            newRankName <- sprintf("%s_%d",rankName,rename_attempts)
           }
           
-          out <- list(estimate=estimate,decomposed_estimate=decomposed_estimate,estimates_by_stratum=estimates_by_stratum)
           
-        } else if( isolate(input$SYMBOLIC_LINK__preferenceType)=="list" ){
-        
-          browser()
+          # If we had to rename the rank variable, it needs updated in the preferences list
+          preference_list <- preferences$list
+          if(newRankName != rankName){
+            colnames(preference_list)[colnames(preference_list)==rankName] <- newRankName
+          }
           
-          # The easiest way to make this work is to add it as a new variable in
-          # the data sheet and then go from there
+          # Set up outcomes as if it were a singular continuous outcome facet
+
+          #TODO: This is is dangerous and needs some checks added
+          data_sheet <- left_join(
+            data_sheet,
+            preference_list
+          )
+          
+          outcomes <- list( list(
+            type="numeric",
+            var=newRankName,
+            tau=0,
+            indicator=NULL,
+            direction=">"
+          ))
+      
+          # if(statistical.method != "debug"){
+          #   errorList[[length(errorList)+1]] <- tryCatch({stop("List method currently in debug mode only")},error=function(e){e})
+          # }
+          
+          total_run <- 1 # Main results
+          
+          if(n_strata>0){
+            estimates_by_stratum <- lapply(1:n_strata, function(i){NULL})
+            total_run <- total_run + n_strata
+          } else {
+            estimates_by_stratum <- NULL
+          }
           
           
+          write(sprintf("Running Main Analysis"), stderr())
+          
+          estimate <- run_analysis(list(data = data_sheet,
+                                        outcomes=outcomes,
+                                        arm=arm,
+                                        levels=levels,
+                                        stratum = stratum,
+                                        stratum.weight = stratum.weight,
+                                        covariates_effect = covariates_effect,
+                                        covariates_censor = covariates_censor,
+                                        method = adjust.method,
+                                        alpha = alpha,
+                                        estimator_method = estimator_method,
+                                        max_iter = max_iter
+          ),
+          statistical.method)
+          
+          errorList[[length(errorList)+1]] <- estimate$error
+          warningList[[length(warningList)+1]] <- estimate$warning
+          estimate <- estimate$out
+          
+          write(sprintf("Done"), stderr())
           
           
+          if(n_strata>0){
+            
+            write(sprintf("Running Stratification"), stderr())
+            
+            
+            if(length(stratum)==1){
+              strata_column <- data_sheet[,stratum]
+            } else {
+              strata_column <-apply(data_sheet[,stratum],1,paste)
+            }
+            
+            
+            
+            stratified_data_sheet <- by(data = data_sheet,
+                                        INDICES = strata_column,
+                                        function(x){x}
+            )
+            
+            
+            # This is incredibly dumb but it will work
+            strata_values <- by(data = data.frame(strata_column=strata_column),
+                                INDICES = strata_column,
+                                function(x){unique(x$strata_column)}
+            )
+            
+            for(j in 1:length(stratified_data_sheet)){
+              
+              
+              incProgress(1/total_run,detail = sprintf("Strata %d",j))
+              
+              strata_val <- strata_values[[j]]
+              
+              strata_estimate <-  run_analysis(list(data = stratified_data_sheet[[j]],
+                                                    outcomes=outcomes,
+                                                    arm=arm,
+                                                    levels=levels,
+                                                    stratum = stratum,
+                                                    stratum.weight = stratum.weight,
+                                                    covariates_effect = covariates_effect,
+                                                    covariates_censor = covariates_censor,
+                                                    method = adjust.method,
+                                                    alpha = alpha,
+                                                    estimator_method = estimator_method,
+                                                    max_iter = max_iter
+              ),
+              statistical.method)
+              
+              errorList[[length(errorList)+1]] <- strata_estimate$error
+              warningList[[length(warningList)+1]] <- strata_estimate$warning
+              strata_estimate <- strata_estimate$out
+              
+              estimates_by_stratum[[j]] <- list(strata_val = strata_val,
+                                                estimate=strata_estimate,
+                                                decomposed_estimate=NULL)
+              
+            } # End for strata
+            
+          } # End if strata
           
           out <- list(estimate=estimate,
                       decomposed_estimate=NULL,
                       estimates_by_stratum=estimates_by_stratum)
-          
+         
         } else {
           
-          stop("Unspecified method used")
+          # Default error message
+          errorList[[length(errorList)+1]] <- tryCatch({stop("Unrecognised preference method")},error=function(e){e})
+          
+        }
           
           
-        } # End outcome method
+        }) # End progress bar
         
+        write(sprintf("Analysis done. Collating error reports"), stderr())
         
+        # After progress bar, show collected error messages
+        n_errors <- length(errorList)
+        n_warnings <- length(warningList)
         
+        if(n_errors+n_warnings>0){
+          
+          
+          print(errorList)
+          print(warningList)
+          
+          messageTitle <- ifelse(n_errors>0,"Error","Warning")
+          
+          if(n_errors>0){
+            errorText <-  table(sapply(errorList,function(x){x$message}))
+            errorText <- sapply(1:length(errorText),function(i){sprintf("<b>%d Error%s:</b> %s",errorText[i],ifelse(errorText[i]>1,"s",""), names(errorText)[i])})
+            errorText <- paste(errorText,collapse="<br>")
+          } else {
+            errorText <- ""
+          }
+          
+          if(n_warnings>0){
+            warningText <-  table(sapply(warningList,function(x){x$message}))
+            warningText <- sapply(1:length(warningText),function(i){sprintf("<b>%d Warning%s:</b> %s",warningText[i],ifelse(warningText[i]>1,"s",""), names(warningText)[i])})
+            warningText <- paste(warningText,collapse="<br>")
+          } else {
+            warningText <- ""
+          }
+          
+          text <- sprintf("%s%s%s",
+                          errorText,
+                          ifelse(n_errors>0 & n_warnings>0, "<br>",""),
+                          warningText
+          )
+          
+          showModal(modalDialog(
+            title=messageTitle,
+            HTML(text),
+            easyClose=TRUE,
+            footer=NULL
+          ))
+          
+        }
         
+        write(sprintf("Done"), stderr())
         
       } # End if not null arm
       
+      write(sprintf("Analysis finished. Returning results to reactives."), stderr())
       print(out)
       DATAANALYSIS__results(out)
+      
+      write(sprintf("Done"), stderr())
     })
     
     
