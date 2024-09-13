@@ -1337,7 +1337,7 @@ list(
     })
     
     
-    
+### Output UI dynamic elements ---------------------------------------------
     reactive_force_results_update <- reactiveVal(0)
     output$DATAANALYSIS__wins_output_ui <- renderUI({
       
@@ -1349,6 +1349,7 @@ list(
       
       out <- list()
       
+  
       if(!is.null(results$estimate)){
         out[[length(out)+1]] <- fluidRow(tableOutput("DATAANALYSIS__wins_output"))
       }
@@ -1356,6 +1357,9 @@ list(
 
       if(!is.null(results$decomposed_estimate)){
         out[[length(out)+1]] <- fluidRow(tableOutput("DATAANALYSIS__wins_output_decompsition"))
+        
+        out[[length(out)+1]] <- fluidRow(plotOutput("DATAANALYSIS__wins_output_decompsition_plot"))
+
       }
 
       if(!is.null(DATAANALYSIS__results()$estimates_by_stratum)){
@@ -1372,8 +1376,86 @@ list(
     })
     
     output$DATAANALYSIS__wins_output_decompsition <- renderTable({
-      DATAANALYSIS__results()$decomposed_estimate
+      DATAANALYSIS__results()$decomposed_estimate %>%
+        arrange(outcome)
     })
+    
+    output$DATAANALYSIS__wins_output_decompsition_plot <- renderPlot({
+      
+      df <- DATAANALYSIS__results()$decomposed_estimate
+      
+      df_overall <- DATAANALYSIS__results()$estimate
+      
+      
+      # TODO: This is dumb and needs fixed
+
+      # This should be a user option      
+      tie_handling <- "split"
+      df %>% filter(outcome=="Win_Odds") -> df
+      df_overall %>% filter(outcome=="Win_Odds") -> df_overall
+      
+            
+      df %>% arrange(level) -> df
+
+      df$win_inherit <- c(0,df$win_cumulative[1:(nrow(df)-1)])
+      df$loss_inherit <- c(0,df$loss_cumulative[1:(nrow(df)-1)])
+     
+      df$this_win_contribution <- df$win_cumulative-df$win_inherit
+      df$this_loss_contribution <- df$loss_cumulative-df$loss_inherit
+      
+
+      # Force data frame into correct structure
+      df %>%
+        select(
+          level,
+          level_names=level_var,
+          win_inherit,
+          win=this_win_contribution,
+          tie=tie_cumulative,
+          loss=this_loss_contribution,
+          loss_inherit=loss_inherit,
+          
+          win_ratio_individual=estimate,
+          ci_lower_individual=lower,
+          ci_upper_individual=upper,
+           
+          win_ratio_cumulative=estimate_cumulative,
+          ci_lower_cumulative=lower_cumulative,
+          ci_upper_cumulative=upper_cumulative
+        ) -> df
+      
+      # Need to get wins/losses/etc into sheet for the plot function
+      df_overall %>%
+        mutate(win_inherit=0,
+               loss_inherit=0,
+               level=max(df$level)+1,
+               level_var="Overall"
+               ) %>%
+        select(
+          level,
+          level_names=level_var,
+          win_inherit,
+          win=win,
+          tie=tie,
+          loss=loss,
+          loss_inherit,
+          
+          win_ratio_individual=estimate,
+          ci_lower_individual=lower,
+          ci_upper_individual=upper,
+          
+          win_ratio_cumulative=estimate,
+          ci_lower_cumulative=lower,
+          ci_upper_cumulative=upper 
+        ) -> df_overall
+
+      plot_data <- rbind(df,df_overall)
+      
+      # Win ratio plot function
+      winRatioPlot(plot_data,tie_handling=tie_handling)
+     
+    })
+    
     
     
     output$DATAANALYSIS__wins_output_by_stratum <- renderTable({
