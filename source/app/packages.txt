@@ -10,6 +10,7 @@ jsonlite
 # if deploying shiny based applications:
 rlang
 tidyverse
+patchwork
 shiny
 crosstalk
 shinyBS

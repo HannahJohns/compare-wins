@@ -39,7 +39,7 @@
 # After that currently nothing but this is stupid and will cause things to
 # break once we start adding e.g. plots, so it needs standardised.
 
-run_analysis <- function(args, method){
+run_analysis <- function(args, method, effect.measure){
   
   print(sprintf("Running %s with args",method))
   print(args)
@@ -67,6 +67,16 @@ run_analysis <- function(args, method){
 
     if(method=="wins"){
       
+      effect_raw <- c("winRatio"="Win_Ratio",
+                      "winOdds"="Win_Odds" ,
+                      "netBenefit"="Net_Benefit"
+      )
+      
+      effect_label <- c("winRatio"="Win Ratio",
+                        "winOdds"="Win Odds" ,
+                        "netBenefit"="Net Benefit"
+                       )
+      
       out <- wins_wrapper(data=args$data,
                           outcomes=args$outcomes,
                           arm=args$arm,
@@ -78,6 +88,10 @@ run_analysis <- function(args, method){
                           pvalue = "two-sided",
                           alpha=args$alpha
       )
+      
+      out %>% 
+        filter(outcome == effect_raw[effect.measure]) %>%
+        mutate(outcome = effect_label[effect.measure]) -> out
       
     } else if (method=="pim"){
       
@@ -477,7 +491,65 @@ wins_wrapper <- function(data, outcomes, arm, levels,
 }
 
 
+analysis_results_to_wr_df <- function(df,df_overall){
 
+  
+  df %>% arrange(level) -> df
+  
+  df$win_inherit <- c(0,df$win_cumulative[1:(nrow(df)-1)])
+  df$loss_inherit <- c(0,df$loss_cumulative[1:(nrow(df)-1)])
+  
+  df$this_win_contribution <- df$win_cumulative-df$win_inherit
+  df$this_loss_contribution <- df$loss_cumulative-df$loss_inherit
+  
+  # Force data frame into correct structure
+  df %>%
+    select(
+      level,
+      level_names=level_var,
+      win_inherit,
+      win=this_win_contribution,
+      tie=tie_cumulative,
+      loss=this_loss_contribution,
+      loss_inherit=loss_inherit,
+      
+      win_ratio_individual=estimate,
+      ci_lower_individual=lower,
+      ci_upper_individual=upper,
+      
+      win_ratio_cumulative=estimate_cumulative,
+      ci_lower_cumulative=lower_cumulative,
+      ci_upper_cumulative=upper_cumulative
+    ) -> df
+  
+  # Need to get wins/losses/etc into sheet for the plot function
+  df_overall %>%
+    mutate(win_inherit=0,
+           loss_inherit=0,
+           level=max(df$level)+1,
+           level_var="Overall"
+    ) %>%
+    select(
+      level,
+      level_names=level_var,
+      win_inherit,
+      win=win,
+      tie=tie,
+      loss=loss,
+      loss_inherit,
+      
+      win_ratio_individual=estimate,
+      ci_lower_individual=lower,
+      ci_upper_individual=upper,
+      
+      win_ratio_cumulative=estimate,
+      ci_lower_cumulative=lower,
+      ci_upper_cumulative=upper 
+    ) -> df_overall
+  
+  rbind(df,df_overall)
+  
+}
 
 
 
@@ -507,8 +579,6 @@ winRatioPlot <- function(df,tie_handling=NA,
     stop(sprintf("Missing variables for: %s. Check input dataframe contains these variables.",
                  paste(setdiff(expected_names, colnames(df)),collapse=", ")))
   }
-  
-  df <- df[,expected_names]
   
   # Set parameters for plot
   outcome_box_width <- 1
@@ -765,7 +835,15 @@ winRatioPlot <- function(df,tie_handling=NA,
     ggplot2::coord_flip() +
     ggplot2::theme_bw()
   
-  patchwork::wrap_plots(wr_box_overall2, wr_forest_overall_diamond_cum2) + patchwork::plot_layout(guides = 'collect')
+  list(
+    overall = wr_box_overall2,
+    forestplot = wr_forest_overall_diamond_cum2,
+    combined=  patchwork::wrap_plots(wr_box_overall2,
+                                     wr_forest_overall_diamond_cum2) +
+                          patchwork::plot_layout(guides = 'collect')
+  )
+  
+
   
 }
 

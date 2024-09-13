@@ -50,6 +50,24 @@ list(
         c(t(outer(input_names,input_index,paste0)))
     }
     
+    output$DATAANALYSIS__effect_measure_ui <- renderUI({
+      
+      if(input$DATAANALYSIS__method == "wins"){
+        choices <- c("Win Ratio"="winRatio",
+                     "Win Odds" = "winOdds",
+                     "Net Benefit" = "netBenefit"
+        )
+      } else {
+        choices <- c("Win Odds" = "winOdds")
+      }
+
+      radioButtons("DATAANALYSIS__effect_measure",
+                   label="Effect Size Measure:",
+                   choices=choices
+                  
+      )
+    })
+    
     output$DATAANALYSIS__ui_options <- renderUI({
       req(SYMBOLIC_LINK__data_sheet())
       data_sheet <- isolate(SYMBOLIC_LINK__data_sheet())
@@ -62,6 +80,7 @@ list(
                                "Probabilistic Index Model Analysis"="pim"
                                # "DEBUG ONLY: SAVE TO DISK" = "debug"
                                )),
+        uiOutput("DATAANALYSIS__effect_measure_ui"),
         # All of this should be nested inside conditional panels
         fluidRow(selectInput(inputId = "DATAANALYSIS__arm",
                              label = "Intervention variable is:",
@@ -804,7 +823,8 @@ list(
         )
         
         preference.method <- isolate(input$SYMBOLIC_LINK__preferenceType)
-        statistical.method <- isolate(input$DATAANALYSIS__method) 
+        statistical.method <- isolate(input$DATAANALYSIS__method)
+        effect.measure <- isolate(input$DATAANALYSIS__effect_measure)
         
         if(is.null(isolate(input$DATAANALYSIS__covariate_strata_method))){
           stratum.weight <- "unstratified"
@@ -888,7 +908,8 @@ list(
                                         estimator_method = estimator_method,
                                         max_iter = max_iter
           ),
-          statistical.method)
+          statistical.method,
+          effect.measure)
           
           errorList[[length(errorList)+1]] <- estimate$error
           warningList[[length(warningList)+1]] <- estimate$warning
@@ -919,7 +940,8 @@ list(
                                                        estimator_method = estimator_method,
                                                        max_iter = max_iter
               ),
-              statistical.method)
+              statistical.method,
+              effect.measure)
               
               errorList[[length(errorList)+1]] <- estimate_by_outcome$error
               warningList[[length(warningList)+1]] <- estimate_by_outcome$warning
@@ -949,7 +971,8 @@ list(
                                                                   estimator_method = estimator_method,
                                                                   max_iter = max_iter
               ),
-              statistical.method)
+              statistical.method,
+              effect.measure)
               
               errorList[[length(errorList)+1]] <- estimate_by_cumulative_outcome$error
               warningList[[length(warningList)+1]] <- estimate_by_cumulative_outcome$warning
@@ -1009,8 +1032,8 @@ list(
                                                     outcomes=outcomes,
                                                     arm=arm,
                                                     levels=levels,
-                                                    stratum = stratum,
-                                                    stratum.weight = stratum.weight,
+                                                    stratum = NULL,
+                                                    stratum.weight = "unstratified",
                                                     covariates_effect = covariates_effect,
                                                     covariates_censor = covariates_censor,
                                                     method = adjust.method,
@@ -1018,7 +1041,8 @@ list(
                                                     estimator_method = estimator_method,
                                                     max_iter = max_iter
               ),
-              statistical.method)
+              statistical.method,
+              effect.measure)
               
               errorList[[length(errorList)+1]] <- strata_estimate$error
               warningList[[length(warningList)+1]] <- strata_estimate$warning
@@ -1035,8 +1059,8 @@ list(
                                                             outcomes=outcomes[i],
                                                             arm=arm,
                                                             levels=levels,
-                                                            stratum = stratum,
-                                                            stratum.weight = stratum.weight,
+                                                            stratum = NULL,
+                                                            stratum.weight = "unstratified",
                                                             covariates_effect = covariates_effect,
                                                             covariates_censor = covariates_censor,
                                                             method = adjust.method,
@@ -1044,7 +1068,8 @@ list(
                                                             estimator_method = estimator_method,
                                                             max_iter = max_iter
                   ),
-                  statistical.method)
+                  statistical.method,
+                  effect.measure)
                   
                   errorList[[length(errorList)+1]] <- estimate_by_outcome$error
                   warningList[[length(warningList)+1]] <- estimate_by_outcome$warning
@@ -1061,8 +1086,8 @@ list(
                                                                        outcomes=outcomes[1:i],
                                                                        arm=arm,
                                                                        levels=levels,
-                                                                       stratum = stratum,
-                                                                       stratum.weight = stratum.weight,
+                                                                       stratum = NULL,
+                                                                       stratum.weight = "unstratified",
                                                                        covariates_effect = covariates_effect,
                                                                        covariates_censor = covariates_censor,
                                                                        method = adjust.method,
@@ -1070,7 +1095,8 @@ list(
                                                                        estimator_method = estimator_method,
                                                                        max_iter = max_iter
                   ),
-                  statistical.method)
+                  statistical.method,
+                  effect.measure)
                   
                   errorList[[length(errorList)+1]] <- estimate_by_cumulative_outcome$error
                   warningList[[length(warningList)+1]] <- estimate_by_cumulative_outcome$warning
@@ -1198,7 +1224,8 @@ list(
                                         estimator_method = estimator_method,
                                         max_iter = max_iter
           ),
-          statistical.method)
+          statistical.method,
+          effect.measure)
           
           errorList[[length(errorList)+1]] <- estimate$error
           warningList[[length(warningList)+1]] <- estimate$warning
@@ -1252,7 +1279,8 @@ list(
                                                     estimator_method = estimator_method,
                                                     max_iter = max_iter
               ),
-              statistical.method)
+              statistical.method,
+              effect.measure)
               
               errorList[[length(errorList)+1]] <- strata_estimate$error
               warningList[[length(warningList)+1]] <- strata_estimate$warning
@@ -1349,21 +1377,32 @@ list(
       
       out <- list()
       
-  
+      # TODO: Add preamble stating what the inputs to this analysis were,
+      # plus a button to save the results
+      
       if(!is.null(results$estimate)){
+        
+        out[[length(out)+1]] <- fluidRow(tags$h4("Results"))
         out[[length(out)+1]] <- fluidRow(tableOutput("DATAANALYSIS__wins_output"))
       }
-    
-
+      
       if(!is.null(results$decomposed_estimate)){
-        out[[length(out)+1]] <- fluidRow(tableOutput("DATAANALYSIS__wins_output_decompsition"))
         
+        out[[length(out)+1]] <- fluidRow(hr(),tags$h4("Breakdown of outcome components"))
         out[[length(out)+1]] <- fluidRow(plotOutput("DATAANALYSIS__wins_output_decompsition_plot"))
-
+        
+        out[[length(out)+1]] <- bsCollapsePanel("Details",
+                                  fluidRow(tableOutput("DATAANALYSIS__wins_output_decompsition"))
+                                )
+        
       }
 
       if(!is.null(DATAANALYSIS__results()$estimates_by_stratum)){
+        
+        out[[length(out)+1]] <- fluidRow(hr(),tags$h4("Results by Strata"))
         out[[length(out)+1]] <- fluidRow(tableOutput("DATAANALYSIS__wins_output_by_stratum"))
+        out[[length(out)+1]] <- fluidRow(plotOutput("DATAANALYSIS__wins_output_by_stratum_decompsition_plot"))
+        
       }
 
       
@@ -1380,80 +1419,61 @@ list(
         arrange(outcome)
     })
     
+    
+    
     output$DATAANALYSIS__wins_output_decompsition_plot <- renderPlot({
       
       df <- DATAANALYSIS__results()$decomposed_estimate
-      
       df_overall <- DATAANALYSIS__results()$estimate
-      
-      
-      # TODO: This is dumb and needs fixed
-
-      # This should be a user option      
-      tie_handling <- "split"
-      df %>% filter(outcome=="Win_Odds") -> df
-      df_overall %>% filter(outcome=="Win_Odds") -> df_overall
-      
-            
-      df %>% arrange(level) -> df
-
-      df$win_inherit <- c(0,df$win_cumulative[1:(nrow(df)-1)])
-      df$loss_inherit <- c(0,df$loss_cumulative[1:(nrow(df)-1)])
      
-      df$this_win_contribution <- df$win_cumulative-df$win_inherit
-      df$this_loss_contribution <- df$loss_cumulative-df$loss_inherit
       
-
-      # Force data frame into correct structure
-      df %>%
-        select(
-          level,
-          level_names=level_var,
-          win_inherit,
-          win=this_win_contribution,
-          tie=tie_cumulative,
-          loss=this_loss_contribution,
-          loss_inherit=loss_inherit,
-          
-          win_ratio_individual=estimate,
-          ci_lower_individual=lower,
-          ci_upper_individual=upper,
-           
-          win_ratio_cumulative=estimate_cumulative,
-          ci_lower_cumulative=lower_cumulative,
-          ci_upper_cumulative=upper_cumulative
-        ) -> df
+      if(unique(df$outcome)=="Win Ratio"){
+        tie_handling <- "drop"
+      } else {
+        tie_handling <- "split"
+      }
       
-      # Need to get wins/losses/etc into sheet for the plot function
-      df_overall %>%
-        mutate(win_inherit=0,
-               loss_inherit=0,
-               level=max(df$level)+1,
-               level_var="Overall"
-               ) %>%
-        select(
-          level,
-          level_names=level_var,
-          win_inherit,
-          win=win,
-          tie=tie,
-          loss=loss,
-          loss_inherit,
-          
-          win_ratio_individual=estimate,
-          ci_lower_individual=lower,
-          ci_upper_individual=upper,
-          
-          win_ratio_cumulative=estimate,
-          ci_lower_cumulative=lower,
-          ci_upper_cumulative=upper 
-        ) -> df_overall
-
-      plot_data <- rbind(df,df_overall)
+      plot_data <- analysis_results_to_wr_df(df,df_overall)
       
-      # Win ratio plot function
-      winRatioPlot(plot_data,tie_handling=tie_handling)
+      plot <- winRatioPlot(plot_data,tie_handling=tie_handling)
+      
+      plot$combined
      
+    })
+    
+    
+    output$DATAANALYSIS__wins_output_by_stratum_decompsition_plot <- renderPlot({
+    
+      results <- DATAANALYSIS__results()$estimates_by_stratum  
+      
+      plotList <- lapply(results, function(this_result){
+        df <- this_result$decomposed_estimate
+        df_overall <- this_result$estimate
+        
+        if(unique(df$outcome)=="Win Ratio"){
+          tie_handling <- "drop"
+        } else {
+          tie_handling <- "split"
+        }
+
+        plot_data <- analysis_results_to_wr_df(df,df_overall)
+
+        plot <- winRatioPlot(plot_data,tie_handling=tie_handling)
+
+        plot$combined
+      })
+      
+      # plotList <- lapply(1:4,function(i){
+      #   ggplot(data.frame(x=rnorm(100),y=rnorm(100)),aes(x=x,y=y))+geom_point()+geom_smooth()+plot_annotation(title=i)
+      #   })
+      
+      # TODO: This is dumb. We'd be better off constructing explicitly using
+      # str2eval or something.
+      
+      plotList[["ncol"]] <- 1
+      
+      do.call("wrap_plots",plotList)
+      
     })
     
     

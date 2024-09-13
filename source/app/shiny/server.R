@@ -9,6 +9,7 @@ library(WINS)
 
 library(rlang)
 library(tidyverse)
+library(patchwork)
 
 source("R/misc_functions.R")
 
