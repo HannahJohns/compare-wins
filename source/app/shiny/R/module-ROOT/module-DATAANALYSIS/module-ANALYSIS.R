@@ -1373,6 +1373,55 @@ list(
       results <- DATAANALYSIS__results()
       print(results)
       
+  
+      # Any reactives we might be interested in are defined here and should
+      # be isolated
+      
+      alpha <- isolate(input$DATAANALYSIS__alpha)
+      
+      data_sheet <- isolate(SYMBOLIC_LINK__data_sheet())
+      preferences <- isolate(SYMBOLIC_LINK__preference_export())
+      arm <- isolate(input$DATAANALYSIS__arm)
+      
+      levels <- isolate(input$DATAANALYSIS__arm_active_selectInput)
+      levels <- c(
+        levels,
+        setdiff(levels(as.factor(data_sheet[,arm])),levels)
+      )
+      print(levels)
+      
+      stratum <- lapply(isolate(DATAANALYSIS__covariates()), function(x){
+        if(x[["stratify"]]){
+          return(x[["var"]])
+        } else {
+          return(NULL)
+        }
+      })
+      stratum <- do.call("c",stratum)
+      print(stratum)
+      
+      
+      # Need to get a list of strata
+      if(length(stratum)>0){
+        if(length(stratum)==1){
+          n_strata <- length(unique(data_sheet[,stratum]))  
+        } else {
+          n_strata <- nrow(unique(data_sheet[,stratum]))          
+        }
+      } else {
+        n_strata <- 0
+      }
+      
+      covariates_effect <- lapply(isolate(DATAANALYSIS__covariates()), function(x){
+        if(x[["stratify"]]){
+          return(NULL)
+        } else {
+          return(x[["var"]])
+        }
+      })
+      covariates_effect <- do.call("c",covariates_effect)
+      print(covariates_effect)
+      
       print("Rendering UI output")
       
       out <- list()
@@ -1384,11 +1433,61 @@ list(
         
         out[[length(out)+1]] <- fluidRow(tags$h4("Results"))
         out[[length(out)+1]] <- fluidRow(tableOutput("DATAANALYSIS__wins_output"))
+        
+     
+        # Report of results template
+        
+        if(n_strata==0){
+          resultTemplate <- sprintf("Of 100 people, %0.2f will have a better outcome if they are treated with %s while %0.2f will have a better outcome if they are treated with %s. %0.2f will have equivalent outcomes under both treatments (%s%s = %0.2f, %2.0f%%CI %0.2f - %0.2f)",
+                                    100*results$estimate$win,
+                                    levels[1],
+                                    100* results$estimate$loss,
+                                    levels[1],
+                                    100* results$estimate$tie,
+                                    ifelse(length(covariates_effect)>0,"Adj. ",""),
+                                    results$estimate$outcome,
+                                    results$estimate$estimate,
+                                    100*(1-alpha),
+                                    results$estimate$lower,
+                                    results$estimate$upper
+          )
+          
+        } else {
+          
+          resultTemplate <- sprintf("%s%s = %0.2f, %2.0f%%CI %0.2f - %0.2f",
+                                    ifelse(length(covariates_effect)>0,"Adj. ",""),
+                                    results$estimate$outcome,
+                                    results$estimate$estimate,
+                                    100*(1-alpha),
+                                    results$estimate$lower,
+                                    results$estimate$upper
+          )
+          
+        }
+        
+        
+        out[[length(out)+1]] <- fluidRow(
+          column(width=2,"Template Results for Reporting:"),
+          column(width=8,resultTemplate
+                 )
+        )
+        
+        
+        if(length(covariates_effect)>0){
+          out[[length(out)+1]] <- fluidRow("NOTE: Proportion of pairs in template shows raw estimates for wins/losses/ties,
+                                           not adjusted values")
+        }
+        
       }
       
       if(!is.null(results$decomposed_estimate)){
         
         out[[length(out)+1]] <- fluidRow(hr(),tags$h4("Breakdown of outcome components"))
+        
+        if(length(covariates_effect)>0){
+          out[[length(out)+1]] <- fluidRow("NOTE: Proportion of pairs (Left plot) shows raw estimates for wins/losses/ties")
+        }
+        
         out[[length(out)+1]] <- fluidRow(plotOutput("DATAANALYSIS__wins_output_decompsition_plot"))
         
         out[[length(out)+1]] <- bsCollapsePanel("Details",
@@ -1425,17 +1524,23 @@ list(
       
       df <- DATAANALYSIS__results()$decomposed_estimate
       df_overall <- DATAANALYSIS__results()$estimate
-     
       
-      if(unique(df$outcome)=="Win Ratio"){
+      
+      estimate_name <- unique(df$outcome)
+      if(estimate_name=="Win Ratio"){
+        neutral_point <- 1
         tie_handling <- "drop"
-      } else {
+      } else if (estimate_name=="Win Odds") {
+        neutral_point <- 1
+        tie_handling <- "split"
+      } else if (estimate_name=="Net Benefit"){
+        neutral_point <- 0
         tie_handling <- "split"
       }
       
       plot_data <- analysis_results_to_wr_df(df,df_overall)
       
-      plot <- winRatioPlot(plot_data,tie_handling=tie_handling)
+      plot <- winRatioPlot(plot_data,tie_handling=tie_handling,neutral_point = neutral_point,estimate_name=estimate_name)
       
       plot$combined
      
@@ -1450,15 +1555,28 @@ list(
         df <- this_result$decomposed_estimate
         df_overall <- this_result$estimate
         
-        if(unique(df$outcome)=="Win Ratio"){
+        estimate_name <- unique(df$outcome)
+        if(estimate_name=="Win Ratio"){
+          neutral_point <- 1
           tie_handling <- "drop"
-        } else {
+        } else if (estimate_name=="Win Odds") {
+          neutral_point <- 1
+          tie_handling <- "split"
+        } else if (estimate_name=="Net Benefit"){
+          neutral_point <- 0
           tie_handling <- "split"
         }
+        
+        
+        #TODO: Add in specification of adjustment etc:
+        
+        # If stratification no adjust : stratified [effect]
+        # If covariate adjustment at any point, adjusted [effect]
+        # If censoring methods used: [method] [effect], adjusted for [covariate-dependent] censoring
 
         plot_data <- analysis_results_to_wr_df(df,df_overall)
 
-        plot <- winRatioPlot(plot_data,tie_handling=tie_handling)
+        plot <- winRatioPlot(plot_data,tie_handling=tie_handling,neutral_point = neutral_point,estimate_name=estimate_name)
 
         plot$combined
       })

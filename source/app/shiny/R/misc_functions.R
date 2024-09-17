@@ -242,6 +242,10 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
    
     
   } else {
+    
+    # NOTE: This shouldn't be called when using list-based methods as we convert
+    # from list-based to heirarchical at the top level
+    
     stop("NON-HEIRARCHICAL METHODS NOT IMPLEMENTED YET")
   }
   
@@ -257,8 +261,6 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
   
   # Join this with the formatted data
  
-  
-  
   
   # Run PIM
   if(link=="logit"){
@@ -334,7 +336,12 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
       conf_interval <- exp(conf_interval)
     }
     
+    
     # Get win/losses/ties. This can be done by getting sign(diff(treatment, control))
+    
+    # NOTE: Win Odds is adjusted for covariates, but individual win/loss/tie proportions are not.
+    # This needs flagged somewhere
+    
     wlt_count <- table(c(sign(outer(
       formatted_data[formatted_data[,arm]==levels[2],"RESERVED__ranked_result"],
       formatted_data[formatted_data[,arm]==levels[1],"RESERVED__ranked_result"],
@@ -554,7 +561,7 @@ analysis_results_to_wr_df <- function(df,df_overall){
 
 
 # Win ratio plot function
-winRatioPlot <- function(df,tie_handling=NA,
+winRatioPlot <- function(df,tie_handling=NA,neutral_point=1,estimate_name="",
                          level="level", level_names="level_names", win_inherit="win_inherit", win="win", tie="tie",
                          loss="loss", loss_inherit="loss_inherit",
                          win_ratio_individual="win_ratio_individual", ci_lower_individual="ci_lower_individual", ci_upper_individual="ci_upper_individual",
@@ -744,10 +751,10 @@ winRatioPlot <- function(df,tie_handling=NA,
   
   # Create dataframe with info to make the green and red background panels for forest plot
   background_colourpanel <- data.frame(favours_int=c(0,1),
-                                       xmin=c((max(df$level)+overall_box_width/2),(max(df$level)+overall_box_width/2)),
-                                       xmax=c(outcome_box_width/2,outcome_box_width/2),
-                                       ymin=c(0,1),
-                                       ymax=c(1,max(df$ci_upper_individual)))
+                                       xmin=c(-Inf,-Inf),
+                                       xmax=c(Inf,Inf),
+                                       ymin=c(-Inf,neutral_point),
+                                       ymax=c(neutral_point,Inf))
   
   background_colourpanel$favours_int <- factor(background_colourpanel$favours_int,
                                                levels = c(0,1),
@@ -769,7 +776,9 @@ winRatioPlot <- function(df,tie_handling=NA,
                                    df_forest$level+forest_plot_line_offset)
   df_forest$outcome_type <- factor(df_forest$outcome_type,
                                    levels = c("_individual", "_cumulative"),
-                                   labels = c("Outcome win ratio", "Cumulative win ratio"))
+                                   labels = paste(c("Outcome","Cumulative"),
+                                                    estimate_name)
+                                  )
   
   
   # Win ratio forest plot with overall level as separate diamond and cumulative win ratio
@@ -787,8 +796,8 @@ winRatioPlot <- function(df,tie_handling=NA,
       values=c("#D10707",
                "#45E928")
     ) +
-    ggplot2::geom_hline(yintercept=1,color="#1A2678") +
-    ggplot2::geom_line(data=df_forest[df_forest$level<max(df$level) & df_forest$outcome_type == "Cumulative win ratio", ],
+    ggplot2::geom_hline(yintercept=neutral_point,color="#1A2678") +
+    ggplot2::geom_line(data=df_forest[df_forest$level<max(df$level) & df_forest$outcome_type == paste("Cumulative",estimate_name), ],
                        ggplot2::aes(
                          x=level_offset,
                          y=win_ratio
@@ -807,10 +816,10 @@ winRatioPlot <- function(df,tie_handling=NA,
         x_coord=c(max(df_forest$level)-forest_plot_polygon_height/2, max(df_forest$level),
                   max(df_forest$level)+forest_plot_polygon_height/2, max(df_forest$level)
         ),
-        y_coord=c(unname(unlist(df_forest[df_forest$level==max(df_forest$level) & df_forest$outcome_type=="Outcome win ratio", "win_ratio"])),
-                  unname(unlist(df_forest[df_forest$level==max(df_forest$level) & df_forest$outcome_type=="Outcome win ratio", "ci_upper"])),
-                  unname(unlist(df_forest[df_forest$level==max(df_forest$level) & df_forest$outcome_type=="Outcome win ratio", "win_ratio"])),
-                  unname(unlist(df_forest[df_forest$level==max(df_forest$level) & df_forest$outcome_type=="Outcome win ratio", "ci_lower"]))
+        y_coord=c(unname(unlist(df_forest[df_forest$level==max(df_forest$level) & df_forest$outcome_type==  paste("Outcome",estimate_name), "win_ratio"])),
+                  unname(unlist(df_forest[df_forest$level==max(df_forest$level) & df_forest$outcome_type==  paste("Outcome",estimate_name), "ci_upper"])),
+                  unname(unlist(df_forest[df_forest$level==max(df_forest$level) & df_forest$outcome_type==  paste("Outcome",estimate_name), "win_ratio"])),
+                  unname(unlist(df_forest[df_forest$level==max(df_forest$level) & df_forest$outcome_type==  paste("Outcome",estimate_name), "ci_lower"]))
         )
       ),
       ggplot2::aes(x=x_coord, y=y_coord)
@@ -823,8 +832,7 @@ winRatioPlot <- function(df,tie_handling=NA,
       )
     ) +
     ggplot2::scale_y_continuous(limits=c(0,NA)) +
-    ggplot2::xlab(NULL) +
-    ggplot2::ylab(expression(bold("Win ratio"))) +
+    labs(x=NULL, y=estimate_name)+
     ggplot2::guides(
       color = ggplot2::guide_legend(reverse = FALSE, title = NULL),
       shape = ggplot2::guide_legend(title = NULL),
@@ -833,7 +841,8 @@ winRatioPlot <- function(df,tie_handling=NA,
     ggplot2::scale_color_manual(values=c("grey40", "black")) +
     ggplot2::scale_shape_manual(values=c(4,16)) +
     ggplot2::coord_flip() +
-    ggplot2::theme_bw()
+    ggplot2::theme_bw()+
+    ggplot2::theme(axis.title.x = element_text(face="bold"))
   
   list(
     overall = wr_box_overall2,
