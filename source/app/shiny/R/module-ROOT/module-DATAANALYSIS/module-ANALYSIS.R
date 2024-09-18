@@ -716,6 +716,10 @@ list(
     
     output$DATAANALYSIS__surv_covariate_options <- renderUI({
       
+      
+      write("BUG: stratification method resets methods on every time we run", stderr())
+      
+      
       out <- NULL
       
       # Only display options if covariates have been added
@@ -1412,7 +1416,8 @@ list(
         n_strata <- 0
       }
       
-      covariates_effect <- lapply(isolate(DATAANALYSIS__covariates()), function(x){
+     
+        covariates_effect <- lapply(isolate(DATAANALYSIS__covariates()), function(x){
         if(x[["stratify"]]){
           return(NULL)
         } else {
@@ -1422,6 +1427,12 @@ list(
       covariates_effect <- do.call("c",covariates_effect)
       print(covariates_effect)
       
+      
+      adjust.method <- isolate(input$DATAANALYSIS__surv_covariate_strata_method)
+      if(is.null(adjust.method)) adjust.method <- "unadjusted"
+      
+      
+      
       print("Rendering UI output")
       
       out <- list()
@@ -1429,16 +1440,19 @@ list(
       # TODO: Add preamble stating what the inputs to this analysis were,
       # plus a button to save the results
       
+      
+      out[[length(out)+1]] <- fluidRow(tags$h4("Methods"))
+      out[[length(out)+1]] <- fluidRow("(Writeup of what methods were used in this analysis to be copy-pasted)")
+      
       if(!is.null(results$estimate)){
         
         out[[length(out)+1]] <- fluidRow(tags$h4("Results"))
         out[[length(out)+1]] <- fluidRow(tableOutput("DATAANALYSIS__wins_output"))
         
-     
-        # Report of results template
+        # Report of results template following Howard's approach
         
         if(n_strata==0){
-          resultTemplate <- sprintf("Of 100 people, %0.2f will have a better outcome if they are treated with %s while %0.2f will have a better outcome if they are treated with %s. %0.2f will have equivalent outcomes under both treatments (%s%s = %0.2f, %2.0f%%CI %0.2f - %0.2f)",
+          resultTemplate <- sprintf("Of 100 people, %0.2f will have a better outcome if they are treated with %s while %0.2f will have a better outcome if they are treated with %s. %0.2f will have equivalent outcomes under both treatments (%s%s = %0.2f, %2.0f%%CI %0.2f - %0.2f).%s",
                                     100*results$estimate$win,
                                     levels[1],
                                     100* results$estimate$loss,
@@ -1449,18 +1463,20 @@ list(
                                     results$estimate$estimate,
                                     100*(1-alpha),
                                     results$estimate$lower,
-                                    results$estimate$upper
+                                    results$estimate$upper,
+                                    ifelse(adjust.method!="unadjusted","This effect size is adjusted for censoring.","")
           )
           
         } else {
           
-          resultTemplate <- sprintf("%s%s = %0.2f, %2.0f%%CI %0.2f - %0.2f",
+          resultTemplate <- sprintf("%s%s = %0.2f, %2.0f%%CI %0.2f - %0.2f. %s",
                                     ifelse(length(covariates_effect)>0,"Adj. ",""),
                                     results$estimate$outcome,
                                     results$estimate$estimate,
                                     100*(1-alpha),
                                     results$estimate$lower,
-                                    results$estimate$upper
+                                    results$estimate$upper,
+                                    ifelse(adjust.method!="unadjusted","This effect size is adjusted for censoring.","")
           )
           
         }
@@ -1520,10 +1536,40 @@ list(
     
     
     
+    ##### DATAANALYSIS__wins_output_decompsition_plot-----
     output$DATAANALYSIS__wins_output_decompsition_plot <- renderPlot({
       
       df <- DATAANALYSIS__results()$decomposed_estimate
       df_overall <- DATAANALYSIS__results()$estimate
+      
+      
+      # Need to know about stratification, covariate adjustments, etc
+      # for rendering plot with appropriate tags
+      
+      stratum <- lapply(isolate(DATAANALYSIS__covariates()), function(x){
+        if(x[["stratify"]]){
+          return(x[["var"]])
+        } else {
+          return(NULL)
+        }
+      })
+      stratum <- do.call("c",stratum)
+      print(stratum)
+      
+      covariates_effect <- lapply(isolate(DATAANALYSIS__covariates()), function(x){
+        if(x[["stratify"]]){
+          return(NULL)
+        } else {
+          return(x[["var"]])
+        }
+      })
+      covariates_effect <- do.call("c",covariates_effect)
+      print(covariates_effect)
+      
+      
+      # print(isolate(DATAANALYSIS__surv_covariates()))
+      adjust.method <- isolate(input$DATAANALYSIS__surv_covariate_strata_method)
+      if(is.null(adjust.method)) adjust.method <- "unadjusted"
       
       
       estimate_name <- unique(df$outcome)
@@ -1538,6 +1584,24 @@ list(
         tie_handling <- "split"
       }
       
+      
+      # Add tags for if results are stratified, etc:
+      
+      # If covariate adjustment at any point, adjusted [effect]
+      if(length(covariates_effect)>0){
+        estimate_name <- sprintf("Adj. %s",estimate_name)
+      } else {
+        # If stratification no adjust : stratified [effect]
+        if(length(stratum)>0){
+          estimate_name <- sprintf("Stratified %s",estimate_name)
+        }
+      }
+      
+      # If censoring methods used: [method] [effect], adjusted for [covariate-dependent] censoring
+      if(adjust.method!= "unadjusted"){
+        estimate_name <- sprintf("%s, adjusted for censoring",estimate_name)
+      } 
+      
       plot_data <- analysis_results_to_wr_df(df,df_overall)
       
       plot <- winRatioPlot(plot_data,tie_handling=tie_handling,neutral_point = neutral_point,estimate_name=estimate_name)
@@ -1546,10 +1610,33 @@ list(
      
     })
     
-    
+    ##### DATAANALYSIS__wins_output_by_stratum_decompsition_plot-----
     output$DATAANALYSIS__wins_output_by_stratum_decompsition_plot <- renderPlot({
     
       results <- DATAANALYSIS__results()$estimates_by_stratum  
+      
+      
+      # Need to know about stratification, covariate adjustments, etc
+      # for rendering plot with appropriate tags
+
+      covariates_effect <- lapply(isolate(DATAANALYSIS__covariates()), function(x){
+        if(x[["stratify"]]){
+          return(NULL)
+        } else {
+          return(x[["var"]])
+        }
+      })
+      covariates_effect <- do.call("c",covariates_effect)
+      print(covariates_effect)
+      
+      
+      # print(isolate(DATAANALYSIS__surv_covariates()))
+      
+      # TODO: Add an additional checks that we didn't set up on WINS then
+      # swap to PIM
+      adjust.method <- isolate(input$DATAANALYSIS__surv_covariate_strata_method)
+      if(is.null(adjust.method)) adjust.method <- "unadjusted"
+      
       
       plotList <- lapply(results, function(this_result){
         df <- this_result$decomposed_estimate
@@ -1567,13 +1654,19 @@ list(
           tie_handling <- "split"
         }
         
+        # Add tags for if results are adjusted, etc:
+        # Note: we don't need to tag stratification in estimate name
         
-        #TODO: Add in specification of adjustment etc:
-        
-        # If stratification no adjust : stratified [effect]
         # If covariate adjustment at any point, adjusted [effect]
+        if(length(covariates_effect)>0){
+          estimate_name <- sprintf("Adj. %s",estimate_name)
+        } 
+        
         # If censoring methods used: [method] [effect], adjusted for [covariate-dependent] censoring
-
+        if(adjust.method!="unadjusted"){
+          estimate_name <- sprintf("%s, adjusted for censoring",estimate_name)
+        } 
+        
         plot_data <- analysis_results_to_wr_df(df,df_overall)
 
         plot <- winRatioPlot(plot_data,tie_handling=tie_handling,neutral_point = neutral_point,estimate_name=estimate_name)
