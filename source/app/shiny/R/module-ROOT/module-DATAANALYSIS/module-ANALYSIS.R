@@ -1369,32 +1369,104 @@ list(
     })
     
     
-### Output UI dynamic elements ---------------------------------------------
-    reactive_force_results_update <- reactiveVal(0)
-    output$DATAANALYSIS__wins_output_ui <- renderUI({
+    ### Output UI dynamic elements ---------------------------------------------
+    
+    
+    methods_changed <- reactiveVal(T)
+    
+    methods_writeup <- reactive({
       
-      reactive_force_results_update()
-      results <- DATAANALYSIS__results()
-      print(results)
       
-  
-      # Any reactives we might be interested in are defined here and should
-      # be isolated
+      # TODO:
+      # Construct a text summary of analysis method to be performed.
+      # Tag it as preliminary or not based on methods_changed
+      # (which needs its own checks, to be implemented next)
+    
+      textBody <- ""
       
-      alpha <- isolate(input$DATAANALYSIS__alpha)
+      arm <- input$DATAANALYSIS__arm
+      if(is.null(arm)){
+        textBody <-  paste(textBody,"There is no intervention variable declared.")
+      } else {
+        textBody <-  paste(textBody,
+                           sprintf("We estimated difference in outcome preference between <b>[%s]</b> groups",
+                                   arm
+                           ))
+        
+        # levels <- isolate(input$DATAANALYSIS__arm_active_selectInput)
+        # levels <- c(
+        #   levels,
+        #   setdiff(levels(as.factor(data_sheet[,arm])),levels)
+        # )
+        
+      }
       
-      data_sheet <- isolate(SYMBOLIC_LINK__data_sheet())
-      preferences <- isolate(SYMBOLIC_LINK__preference_export())
-      arm <- isolate(input$DATAANALYSIS__arm)
+      preference.method <- input$SYMBOLIC_LINK__preferenceType
+      if(is.null(preference.method)){
+        textBody <-  paste(textBody,"There is no preference method loaded.")
+      } else {
+        textBody <-  paste(textBody,
+                           sprintf(", where all-to-all preferences are defined using a %s approach",
+                                   preference.method
+                                   ))
+        
+        preferences <- SYMBOLIC_LINK__preference_export()
+        if(is.null(preference.method)){
+          textBody <-  paste0(textBody,"No preference specification is loaded")
+        } else {
+          
+          # TODO: Get summary of preference specification
+          if(preference.method=="heirarchical"){
+            
+            preference_specification <- sprintf(
+              ". Outcome facets are, in decreasing order of importance, %s",
+              paste(do.call("c",
+                lapply(preferences$heirarchical, function(x){
+                  sprintf("<b>[%s]</b> (%s%s)",
+                          x$var,
+                          ifelse(x$direction==">","Higher is better","Lower is better"),
+                          ifelse(x$tau>0,sprintf(", Min. important difference %f",x$tau),"")
+                          )
+                })
+              ), collapse="; ")
+            )
+            
+          } else if (preference.method=="list") {
+            
+            preference_specification <- "(Table X)"
+            
+          } else {
+            preference_specification <- "<b>[UNRECOGNISED PREFERENCE SPECIFICATION]</b>"
+          }
+          
+          textBody <-  sprintf("%s%s",
+                               textBody,
+                               preference_specification
+                               )
+          
+        }
+      }
       
-      levels <- isolate(input$DATAANALYSIS__arm_active_selectInput)
-      levels <- c(
-        levels,
-        setdiff(levels(as.factor(data_sheet[,arm])),levels)
-      )
-      print(levels)
       
-      stratum <- lapply(isolate(DATAANALYSIS__covariates()), function(x){
+      effect.measure <- input$DATAANALYSIS__effect_measure
+      if(!is.null(effect.measure)){
+        textBody <-  sprintf("%s. Difference in outcome preference is summarised using the %s statistic",
+                             textBody,
+                             effect.measure
+        )
+      }
+      
+      statistical.method <- input$DATAANALYSIS__method
+      if(!is.null(statistical.method)){
+        textBody <-  sprintf("%s, calculated using %s",
+                             textBody,
+                             statistical.method
+        )
+      }
+
+      stratum <- NULL
+      covariates_effect <- NULL
+      stratum <- lapply(DATAANALYSIS__covariates(), function(x){
         if(x[["stratify"]]){
           return(x[["var"]])
         } else {
@@ -1402,22 +1474,8 @@ list(
         }
       })
       stratum <- do.call("c",stratum)
-      print(stratum)
-      
-      
-      # Need to get a list of strata
-      if(length(stratum)>0){
-        if(length(stratum)==1){
-          n_strata <- length(unique(data_sheet[,stratum]))  
-        } else {
-          n_strata <- nrow(unique(data_sheet[,stratum]))          
-        }
-      } else {
-        n_strata <- 0
-      }
-      
-     
-        covariates_effect <- lapply(isolate(DATAANALYSIS__covariates()), function(x){
+
+      covariates_effect <- lapply(DATAANALYSIS__covariates(), function(x){
         if(x[["stratify"]]){
           return(NULL)
         } else {
@@ -1425,127 +1483,113 @@ list(
         }
       })
       covariates_effect <- do.call("c",covariates_effect)
-      print(covariates_effect)
       
       
-      adjust.method <- isolate(input$DATAANALYSIS__surv_covariate_strata_method)
-      if(is.null(adjust.method)) adjust.method <- "unadjusted"
-      
-      
-      
-      print("Rendering UI output")
-      
-      out <- list()
-      
-      # TODO: Add preamble stating what the inputs to this analysis were,
-      # plus a button to save the results
-      
-      
-      out[[length(out)+1]] <- fluidRow(tags$h4("Methods"))
-      out[[length(out)+1]] <- fluidRow("(Writeup of what methods were used in this analysis to be copy-pasted)")
-      
-      if(!is.null(results$estimate)){
+      if(length(stratum)>0){
+        textBody <- sprintf("%s. Analysis was stratified by <b>[%s]</b>",
+                            textBody,
+                            paste(stratum,collapse=", ")
+                            )
         
-        out[[length(out)+1]] <- fluidRow(tags$h4("Results"))
-        out[[length(out)+1]] <- fluidRow(tableOutput("DATAANALYSIS__wins_output"))
-        
-        # Report of results template following Howard's approach
-        
-        if(n_strata==0){
-          resultTemplate <- sprintf("Of 100 people, %0.2f will have a better outcome if they are treated with %s while %0.2f will have a better outcome if they are treated with %s. %0.2f will have equivalent outcomes under both treatments (%s%s = %0.2f, %2.0f%%CI %0.2f - %0.2f).%s",
-                                    100*results$estimate$win,
-                                    levels[1],
-                                    100* results$estimate$loss,
-                                    levels[1],
-                                    100* results$estimate$tie,
-                                    ifelse(length(covariates_effect)>0,"Adj. ",""),
-                                    results$estimate$outcome,
-                                    results$estimate$estimate,
-                                    100*(1-alpha),
-                                    results$estimate$lower,
-                                    results$estimate$upper,
-                                    ifelse(adjust.method!="unadjusted","This effect size is adjusted for censoring.","")
+        if(length(covariates_effect)>0){
+          textBody <- sprintf("%s and adjusted for differences in <b>[%s]</b>",
+                              textBody,
+                              paste(covariates_effect,collapse=", ")
           )
-          
-        } else {
-          
-          resultTemplate <- sprintf("%s%s = %0.2f, %2.0f%%CI %0.2f - %0.2f. %s",
-                                    ifelse(length(covariates_effect)>0,"Adj. ",""),
-                                    results$estimate$outcome,
-                                    results$estimate$estimate,
-                                    100*(1-alpha),
-                                    results$estimate$lower,
-                                    results$estimate$upper,
-                                    ifelse(adjust.method!="unadjusted","This effect size is adjusted for censoring.","")
-          )
-          
         }
         
+        stratum.weight <- input$DATAANALYSIS__covariate_strata_method
+        if(is.null(stratum.weight)){
+           stratum.weight <- "unstratified"
+        } 
         
-        out[[length(out)+1]] <- fluidRow(
-          column(width=2,"Template Results for Reporting:"),
-          column(width=8,resultTemplate
-                 )
+        if(stratum.weight!="unstratified"){
+          textBody <- sprintf("%s. Strata were pooled using %s weights",
+                              textBody,
+                              stratum.weight
+          )
+        }
+  
+      } else {
+        if(length(covariates_effect)>0){
+          textBody <- sprintf("%s. Analysis was adjusted for differences in <b>[%s]</b>",
+                              textBody,
+                              paste(covariates_effect,collapse=", ")
+          )
+        }
+      }
+      
+      adjust.method <- input$DATAANALYSIS__surv_covariate_strata_method
+      if(is.null(adjust.method)){
+        adjust.method <- "unadjusted"
+      }
+      
+      if(adjust.method != "unadjusted"){
+
+        textBody <- sprintf("%s. Analysis adjusts for censoring using the %s method",
+                            textBody,
+                            adjust.method
         )
-        
-        
-        if(length(covariates_effect)>0){
-          out[[length(out)+1]] <- fluidRow("NOTE: Proportion of pairs in template shows raw estimates for wins/losses/ties,
-                                           not adjusted values")
+
+        covariates_censor <- NULL
+        covariates_censor <- sapply(DATAANALYSIS__surv_covariates(), function(x){
+          return(x[["var"]])
+        })
+
+        if(length(covariates_censor)>0){
+          textBody <- sprintf("%s based on <b>[%s]</b>",
+                              textBody,
+                              paste(covariates_censor, collapse=", ")
+          )
         }
-        
+
+      }
+           
+      # alpha <- isolate(input$DATAANALYSIS__alpha)
+      # estimator_method <- isolate(input$DATAANALYSIS__pim_estimator)
+      # max_iter <- isolate(input$DATAANALYSIS__pim_estimator_max_iter)
+      
+      if(methods_changed()){
+        frontTags <- "<font color='#000000'>" # This really should be CSS
+        endTags <- "</font>"
+      } else {
+        frontTags <- ""
+        endTags <- ""         
       }
       
-      if(!is.null(results$decomposed_estimate)){
-        
-        out[[length(out)+1]] <- fluidRow(hr(),tags$h4("Breakdown of outcome components"))
-        
-        if(length(covariates_effect)>0){
-          out[[length(out)+1]] <- fluidRow("NOTE: Proportion of pairs (Left plot) shows raw estimates for wins/losses/ties")
-        }
-        
-        out[[length(out)+1]] <- fluidRow(plotOutput("DATAANALYSIS__wins_output_decompsition_plot"))
-        
-        out[[length(out)+1]] <- bsCollapsePanel("Details",
-                                  fluidRow(tableOutput("DATAANALYSIS__wins_output_decompsition"))
-                                )
-        
-      }
-
-      if(!is.null(DATAANALYSIS__results()$estimates_by_stratum)){
-        
-        out[[length(out)+1]] <- fluidRow(hr(),tags$h4("Results by Strata"))
-        out[[length(out)+1]] <- fluidRow(tableOutput("DATAANALYSIS__wins_output_by_stratum"))
-        out[[length(out)+1]] <- fluidRow(plotOutput("DATAANALYSIS__wins_output_by_stratum_decompsition_plot"))
-        
-      }
-
+      print(textBody)
       
-      out <- do.call("tagList",out)
-      out
-    })  
-    
-    output$DATAANALYSIS__wins_output <- renderTable({
-      DATAANALYSIS__results()$estimate
-    })
-    
-    output$DATAANALYSIS__wins_output_decompsition <- renderTable({
-      DATAANALYSIS__results()$decomposed_estimate %>%
-        arrange(outcome)
+      out <- sprintf("%s %s %s",frontTags,textBody,endTags)
+      
+      HTML(out)
     })
     
     
-    
-    ##### DATAANALYSIS__wins_output_decompsition_plot-----
-    output$DATAANALYSIS__wins_output_decompsition_plot <- renderPlot({
-      
-      df <- DATAANALYSIS__results()$decomposed_estimate
-      df_overall <- DATAANALYSIS__results()$estimate
-      
-      
-      # Need to know about stratification, covariate adjustments, etc
-      # for rendering plot with appropriate tags
-      
+    reactive_force_results_update <- reactiveVal(0)
+    output$DATAANALYSIS__wins_output_ui <- renderUI({
+
+      reactive_force_results_update()
+      results <- DATAANALYSIS__results()
+      print(results)
+
+
+      # Any reactives we might be interested in are defined here and should
+      # be isolated
+
+      alpha <- isolate(input$DATAANALYSIS__alpha)
+
+      data_sheet <- isolate(SYMBOLIC_LINK__data_sheet())
+      preferences <- isolate(SYMBOLIC_LINK__preference_export())
+      arm <- isolate(input$DATAANALYSIS__arm)
+ 
+      levels <- isolate(input$DATAANALYSIS__arm_active_selectInput)
+      if(!is.null(levels)){
+        levels <- c(
+          levels,
+          setdiff(levels(as.factor(data_sheet[,arm])),levels)
+        )
+      }
+
       stratum <- lapply(isolate(DATAANALYSIS__covariates()), function(x){
         if(x[["stratify"]]){
           return(x[["var"]])
@@ -1555,7 +1599,20 @@ list(
       })
       stratum <- do.call("c",stratum)
       print(stratum)
-      
+
+
+      # Need to get a list of strata
+      if(length(stratum)>0){
+        if(length(stratum)==1){
+          n_strata <- length(unique(data_sheet[,stratum]))
+        } else {
+          n_strata <- nrow(unique(data_sheet[,stratum]))
+        }
+      } else {
+        n_strata <- 0
+      }
+
+
       covariates_effect <- lapply(isolate(DATAANALYSIS__covariates()), function(x){
         if(x[["stratify"]]){
           return(NULL)
@@ -1565,13 +1622,151 @@ list(
       })
       covariates_effect <- do.call("c",covariates_effect)
       print(covariates_effect)
+
+
+      adjust.method <- isolate(input$DATAANALYSIS__surv_covariate_strata_method)
+      if(is.null(adjust.method)) adjust.method <- "unadjusted"
+
+      print("Rendering UI output")
+
+      out <- list()
+
+      out[[length(out)+1]] <- fluidRow(column(width=8,
+                                              tags$h4("Methods Reporting Template"),
+                                              methods_writeup()
+                                              ))
       
+      # TODO: Add a button to save the results/configure things
       
+
+      if(!is.null(results$estimate)){
+
+        out[[length(out)+1]] <- fluidRow(tags$h4("Results"))
+        out[[length(out)+1]] <- fluidRow(tableOutput("DATAANALYSIS__wins_output"))
+
+        # Report of results template following Howard's approach
+
+        if(n_strata==0){
+          resultTemplate <- sprintf("Of 100 people, %0.2f will have a better outcome if they are treated with %s while %0.2f will have a better outcome if they are treated with %s. %0.2f will have equivalent outcomes under both treatments (%s%s = %0.2f, %2.0f%%CI %0.2f - %0.2f).%s",
+                                    100*results$estimate$win,
+                                    levels[1],
+                                    100* results$estimate$loss,
+                                    levels[2],
+                                    100* results$estimate$tie,
+                                    ifelse(length(covariates_effect)>0,"Adj. ",""),
+                                    results$estimate$outcome,
+                                    results$estimate$estimate,
+                                    100*(1-alpha),
+                                    results$estimate$lower,
+                                    results$estimate$upper,
+                                    ifelse(adjust.method!="unadjusted","This effect size is adjusted for censoring.","")
+          )
+
+        } else {
+
+          resultTemplate <- sprintf("%s%s = %0.2f, %2.0f%%CI %0.2f - %0.2f. %s",
+                                    ifelse(length(covariates_effect)>0,"Adj. ",""),
+                                    results$estimate$outcome,
+                                    results$estimate$estimate,
+                                    100*(1-alpha),
+                                    results$estimate$lower,
+                                    results$estimate$upper,
+                                    ifelse(adjust.method!="unadjusted","This effect size is adjusted for censoring.","")
+          )
+
+        }
+
+
+        out[[length(out)+1]] <- fluidRow(
+          column(width=2,"Template Results for Reporting:"),
+          column(width=8,resultTemplate
+                 )
+        )
+
+
+        if(length(covariates_effect)>0){
+          out[[length(out)+1]] <- fluidRow("NOTE: Proportion of pairs in template shows raw estimates for wins/losses/ties,
+                                           not adjusted values")
+        }
+
+      }
+
+      if(!is.null(results$decomposed_estimate)){
+
+        out[[length(out)+1]] <- fluidRow(hr(),tags$h4("Breakdown of outcome components"))
+
+        if(length(covariates_effect)>0){
+          out[[length(out)+1]] <- fluidRow("NOTE: Proportion of pairs (Left plot) shows raw estimates for wins/losses/ties")
+        }
+
+        out[[length(out)+1]] <- fluidRow(plotOutput("DATAANALYSIS__wins_output_decompsition_plot"))
+
+        out[[length(out)+1]] <- bsCollapsePanel("Details",
+                                  fluidRow(tableOutput("DATAANALYSIS__wins_output_decompsition"))
+                                )
+
+      }
+
+      if(!is.null(DATAANALYSIS__results()$estimates_by_stratum)){
+
+        out[[length(out)+1]] <- fluidRow(hr(),tags$h4("Results by Strata"))
+        out[[length(out)+1]] <- fluidRow(tableOutput("DATAANALYSIS__wins_output_by_stratum"))
+        out[[length(out)+1]] <- fluidRow(plotOutput("DATAANALYSIS__wins_output_by_stratum_decompsition_plot"))
+
+      }
+
+
+      out <- do.call("tagList",out)
+      out
+    })
+    
+    output$DATAANALYSIS__wins_output <- renderTable({
+      DATAANALYSIS__results()$estimate
+    })
+
+    output$DATAANALYSIS__wins_output_decompsition <- renderTable({
+      DATAANALYSIS__results()$decomposed_estimate %>%
+        arrange(outcome)
+    })
+
+    
+    
+    #### DATAANALYSIS__wins_output_decompsition_plot-----
+    output$DATAANALYSIS__wins_output_decompsition_plot <- renderPlot({
+
+      df <- DATAANALYSIS__results()$decomposed_estimate
+      df_overall <- DATAANALYSIS__results()$estimate
+
+
+      # Need to know about stratification, covariate adjustments, etc
+      # for rendering plot with appropriate tags
+
+      stratum <- lapply(isolate(DATAANALYSIS__covariates()), function(x){
+        if(x[["stratify"]]){
+          return(x[["var"]])
+        } else {
+          return(NULL)
+        }
+      })
+      stratum <- do.call("c",stratum)
+      print(stratum)
+
+      covariates_effect <- lapply(isolate(DATAANALYSIS__covariates()), function(x){
+        if(x[["stratify"]]){
+          return(NULL)
+        } else {
+          return(x[["var"]])
+        }
+      })
+      covariates_effect <- do.call("c",covariates_effect)
+      print(covariates_effect)
+
+
       # print(isolate(DATAANALYSIS__surv_covariates()))
       adjust.method <- isolate(input$DATAANALYSIS__surv_covariate_strata_method)
       if(is.null(adjust.method)) adjust.method <- "unadjusted"
-      
-      
+
+
       estimate_name <- unique(df$outcome)
       if(estimate_name=="Win Ratio"){
         neutral_point <- 1
@@ -1583,10 +1778,10 @@ list(
         neutral_point <- 0
         tie_handling <- "split"
       }
-      
-      
+
+
       # Add tags for if results are stratified, etc:
-      
+
       # If covariate adjustment at any point, adjusted [effect]
       if(length(covariates_effect)>0){
         estimate_name <- sprintf("Adj. %s",estimate_name)
@@ -1596,26 +1791,26 @@ list(
           estimate_name <- sprintf("Stratified %s",estimate_name)
         }
       }
-      
+
       # If censoring methods used: [method] [effect], adjusted for [covariate-dependent] censoring
       if(adjust.method!= "unadjusted"){
         estimate_name <- sprintf("%s, adjusted for censoring",estimate_name)
-      } 
-      
+      }
+
       plot_data <- analysis_results_to_wr_df(df,df_overall)
-      
+
       plot <- winRatioPlot(plot_data,tie_handling=tie_handling,neutral_point = neutral_point,estimate_name=estimate_name)
-      
+
       plot$combined
-     
+
     })
     
-    ##### DATAANALYSIS__wins_output_by_stratum_decompsition_plot-----
+    #### DATAANALYSIS__wins_output_by_stratum_decompsition_plot-----
     output$DATAANALYSIS__wins_output_by_stratum_decompsition_plot <- renderPlot({
-    
-      results <- DATAANALYSIS__results()$estimates_by_stratum  
-      
-      
+
+      results <- DATAANALYSIS__results()$estimates_by_stratum
+
+
       # Need to know about stratification, covariate adjustments, etc
       # for rendering plot with appropriate tags
 
@@ -1628,20 +1823,20 @@ list(
       })
       covariates_effect <- do.call("c",covariates_effect)
       print(covariates_effect)
-      
-      
+
+
       # print(isolate(DATAANALYSIS__surv_covariates()))
-      
+
       # TODO: Add an additional checks that we didn't set up on WINS then
       # swap to PIM
       adjust.method <- isolate(input$DATAANALYSIS__surv_covariate_strata_method)
       if(is.null(adjust.method)) adjust.method <- "unadjusted"
-      
-      
+
+
       plotList <- lapply(results, function(this_result){
         df <- this_result$decomposed_estimate
         df_overall <- this_result$estimate
-        
+
         estimate_name <- unique(df$outcome)
         if(estimate_name=="Win Ratio"){
           neutral_point <- 1
@@ -1653,38 +1848,38 @@ list(
           neutral_point <- 0
           tie_handling <- "split"
         }
-        
+
         # Add tags for if results are adjusted, etc:
         # Note: we don't need to tag stratification in estimate name
-        
+
         # If covariate adjustment at any point, adjusted [effect]
         if(length(covariates_effect)>0){
           estimate_name <- sprintf("Adj. %s",estimate_name)
-        } 
-        
+        }
+
         # If censoring methods used: [method] [effect], adjusted for [covariate-dependent] censoring
         if(adjust.method!="unadjusted"){
           estimate_name <- sprintf("%s, adjusted for censoring",estimate_name)
-        } 
-        
+        }
+
         plot_data <- analysis_results_to_wr_df(df,df_overall)
 
         plot <- winRatioPlot(plot_data,tie_handling=tie_handling,neutral_point = neutral_point,estimate_name=estimate_name)
 
         plot$combined
       })
-      
+
       # plotList <- lapply(1:4,function(i){
       #   ggplot(data.frame(x=rnorm(100),y=rnorm(100)),aes(x=x,y=y))+geom_point()+geom_smooth()+plot_annotation(title=i)
       #   })
-      
+
       # TODO: This is dumb. We'd be better off constructing explicitly using
       # str2eval or something.
-      
+
       plotList[["ncol"]] <- 1
-      
+
       do.call("wrap_plots",plotList)
-      
+
     })
     
     
@@ -1692,14 +1887,14 @@ list(
     output$DATAANALYSIS__wins_output_by_stratum <- renderTable({
       results <- DATAANALYSIS__results()
       out <- NULL
-      
+
       if(length(results$estimates_by_stratum)>0){
         out <- do.call("rbind",lapply(1:length(results$estimates_by_stratum),function(i){
           cbind(strata=results$estimates_by_stratum[[i]]$strata_val,
                 results$estimates_by_stratum[[i]]$estimate)
         }))
       }
-      
+
       out
     })
     
