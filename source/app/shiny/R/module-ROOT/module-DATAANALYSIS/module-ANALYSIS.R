@@ -44,11 +44,7 @@ list(
     )
   ),
   server_element = substitute({
-    
-    # Convenience function for getting a list of reactive inputs
-    inputCollection <- function(input_names,input_index){
-        c(t(outer(input_names,input_index,paste0)))
-    }
+   
     
     output$DATAANALYSIS__effect_measure_ui <- renderUI({
       
@@ -200,153 +196,6 @@ list(
     # Observer for forcing a UI update
     DATAANALYSIS__force_covar_UI_update <- reactiveVal(0)
     
-    output$DATAANALYSIS__covariates_components <- renderUI({
-      
-      req(SYMBOLIC_LINK__data_sheet())
-      
-      # Trigger update of this section only when signaled to do so.
-      # There is probably a better way to do this, but it works
-      DATAANALYSIS__force_covar_UI_update()
-      
-      currentMethod <- isolate(input$DATAANALYSIS__method)
-      
-      data_sheet <- isolate(SYMBOLIC_LINK__data_sheet())
-      
-      new_covariates <- isolate(DATAANALYSIS__covariates())
-      
-      add_covariate_button <-  fluidRow(
-        actionButton("DATAANALYSIS__add_covariate",
-                     "Add Covariate",
-                     class="DATAANALYSIS__ui_updater")
-      )  
-      
-      if(length(new_covariates)==0){
-        out <- tagList(
-          fluidRow(column(width=12,
-                          add_covariate_button
-          ))
-        )
-      } else {
-        
-        out <- tagList(
-          do.call("tagList", lapply(1:length(new_covariates), function(i){
-            
-            # Default values for this covariate are taken from whatever the currently
-            # stored values are.
-            
-            thisRow <- new_covariates[[i]]
-            if(is.null(thisRow)) return(NULL)
-            
-            tagList(
-              fluidRow(
-                column(width=5,
-                       selectInput(inputId = sprintf("DATAANALYSIS__component_var_%d",i),
-                                   label = "",
-                                   choices = colnames(data_sheet),
-                                   selected=thisRow[["var"]]
-                                   
-                       )
-                ),
-                column(width=2,
-                       checkboxInput(inputId = sprintf("DATAANALYSIS__component_stratify_%d",i),
-                                     label = "Stratify?",
-                                     value=thisRow[["stratify"]] #ifelse(currentMethod=="wins",TRUE,FALSE) # TODO: THIS SHOULD GRAB FROM THE COVARIATE LIST
-                       )
-                ),
-                column(width=5,
-                       actionButton(inputId = sprintf("DATAANALYSIS__component_up_%d",i),
-                                    label = "Up",
-                                    class="DATAANALYSIS__ui_updater"
-                       ),
-                       actionButton(inputId = sprintf("DATAANALYSIS__component_down_%d",i),
-                                    label = "Down",
-                                    class="DATAANALYSIS__ui_updater"
-                       ),
-                       actionButton(inputId = sprintf("DATAANALYSIS__component_delete_%d",i),
-                                    label = "Delete",
-                                    class="DATAANALYSIS__ui_updater"
-                       )   
-                )
-              ),
-              fluidRow(
-                hr()
-              )
-            )
-          })),
-          
-          fluidRow(column(width=12,
-                          add_covariate_button
-          )
-          )
-        )
-      }
-      
-      out
-      
-    })
-    
-    
-    # Observer for changing DATAANALYSIS__covariates in response to UI input
-    # This doesn't require the same janky JS script hooks as there's not really
-    # any need to track what the last button press was
-    observeEvent(
-      lapply(
-        inputCollection(
-          c("DATAANALYSIS__component_var_",
-            "DATAANALYSIS__component_stratify_"),
-          1:length(isolate(DATAANALYSIS__covariates()))
-        ),
-        function(x) input[[x]]
-      ),{
-
-          # This is much cleaner than using JS tags, my god.
-          # rewrite interactive bits for this module using this and then we can port
-          # back over to preferencedefinition.
-
-          # Get a list of all relevant components
-          inputNames <- inputCollection(c("DATAANALYSIS__component_var_",
-                                          "DATAANALYSIS__component_stratify_"),
-                                        1:length(isolate(DATAANALYSIS__covariates())))
-
-          
-      
-          obj <- lapply(inputNames,function(x){input[[x]]})
-          names(obj) <- inputNames
-          
-          # Update the covariates list based on current inputs
-
-          covariates_tmp <- isolate(DATAANALYSIS__covariates())
-          
-          if(length(covariates_tmp)>0){
-            
-            lapply(inputNames, function(i){
-              
-              # Extract out what the name "i" corresponds to
-              varIdLabels <- c(
-                var="DATAANALYSIS__component_var_",
-                stratify="DATAANALYSIS__component_stratify_"
-              )
-              
-              changeType <- which(sapply(varIdLabels,grepl,x=i))
-              changeType <- names(varIdLabels)[changeType]
-              if(length(changeType)!=1){
-                stop("Something is wrong")
-              }
-              
-              change_number <- as.numeric(gsub(varIdLabels[changeType],"",i))
-              
-              # Violating scope is not ideal but it works
-              covariates_tmp[[change_number]][[changeType]] <<- obj[[i]]
-              
-              NULL
-            })
-            
-            DATAANALYSIS__covariates(covariates_tmp)
-            
-          }
-    })
-    
-    
     # If an action was taken that causes structural change to 
     # Preference list (i.e. added/removed/re-ordered details)
     # Make these changes as neccesary 
@@ -432,46 +281,194 @@ list(
       }
     })
     
+   
+    
+    output$DATAANALYSIS__covariates_components <- renderUI({
+      
+      req(SYMBOLIC_LINK__data_sheet())
+      
+      # Trigger update of this section only when signaled to do so.
+      # There is probably a better way to do this, but it works
+      DATAANALYSIS__force_covar_UI_update()
+      
+      currentMethod <- isolate(input$DATAANALYSIS__method)
+      
+      data_sheet <- isolate(SYMBOLIC_LINK__data_sheet())
+      
+      new_covariates <- isolate(DATAANALYSIS__covariates())
+      
+      add_covariate_button <-  fluidRow(
+        actionButton("DATAANALYSIS__add_covariate",
+                     "Add Covariate",
+                     class="DATAANALYSIS__ui_updater")
+      )  
+      
+      if(length(new_covariates)==0){
+        out <- tagList(
+          fluidRow(column(width=12,
+                          add_covariate_button
+          ))
+        )
+      } else {
+        out <- tagList(
+          do.call("tagList", lapply(1:length(new_covariates), function(i){
+            
+            # Default values for this covariate are taken from whatever the currently
+            # stored values are.
+            
+            thisRow <- new_covariates[[i]]
+            if(is.null(thisRow)) return(NULL)
+            
+            tagList(
+              fluidRow(
+                column(width=5,
+                       selectInput(inputId = sprintf("DATAANALYSIS__component_var_%d",i),
+                                   label = "",
+                                   choices = colnames(data_sheet),
+                                   selected=thisRow[["var"]]
+                                   
+                       )
+                ),
+                column(width=2,
+                       checkboxInput(inputId = sprintf("DATAANALYSIS__component_stratify_%d",i),
+                                     label = "Stratify?",
+                                     value=thisRow[["stratify"]] #ifelse(currentMethod=="wins",TRUE,FALSE) # TODO: THIS SHOULD GRAB FROM THE COVARIATE LIST
+                       )
+                ),
+                column(width=5,
+                       actionButton(inputId = sprintf("DATAANALYSIS__component_up_%d",i),
+                                    label = "Up",
+                                    class="DATAANALYSIS__ui_updater"
+                       ),
+                       actionButton(inputId = sprintf("DATAANALYSIS__component_down_%d",i),
+                                    label = "Down",
+                                    class="DATAANALYSIS__ui_updater"
+                       ),
+                       actionButton(inputId = sprintf("DATAANALYSIS__component_delete_%d",i),
+                                    label = "Delete",
+                                    class="DATAANALYSIS__ui_updater"
+                       )   
+                )
+              ),
+              fluidRow(
+                hr()
+              )
+            )
+          })),
+          
+          fluidRow(column(width=12,
+                          add_covariate_button
+          )
+          )
+        )
+      }
+      
+      out
+      
+    })
+    
+    
+    
+    # Observer for changing DATAANALYSIS__covariates in response to UI input
+    # This doesn't require the same janky JS script hooks as there's not really
+    # any need to track what the last button press was
+    observeEvent(
+      lapply(
+        inputCollection(
+          c("DATAANALYSIS__component_var_",                   # I don't know why it's necessary that we look up to
+            "DATAANALYSIS__component_stratify_"),             # length()+1, but doing so fixes problems with this
+          1:(length(isolate(DATAANALYSIS__covariates())) +1 ) # event not triggering elements of the final index get updated 
+        ),
+        function(x) input[[x]]
+      ),{
+
+          # This is much cleaner than using JS tags, my god.
+          # rewrite interactive bits for this module using this and then we can port
+          # back over to preferencedefinition.
+
+          # Get a list of all relevant components
+          inputNames <- inputCollection(c("DATAANALYSIS__component_var_",
+                                          "DATAANALYSIS__component_stratify_"),
+                                        1:length(isolate(DATAANALYSIS__covariates())))
+
+          
+      
+          obj <- lapply(inputNames,function(x){input[[x]]})
+          names(obj) <- inputNames
+          
+          # Update the covariates list based on current inputs
+
+          covariates_tmp <- isolate(DATAANALYSIS__covariates())
+          
+          if(length(covariates_tmp)>0){
+            
+            lapply(inputNames, function(i){
+              
+              # Extract out what the name "i" corresponds to
+              varIdLabels <- c(
+                var="DATAANALYSIS__component_var_",
+                stratify="DATAANALYSIS__component_stratify_"
+              )
+              
+              changeType <- which(sapply(varIdLabels,grepl,x=i))
+              changeType <- names(varIdLabels)[changeType]
+              if(length(changeType)!=1){
+                stop("Something is wrong")
+              }
+              
+              change_number <- as.numeric(gsub(varIdLabels[changeType],"",i))
+              
+              # Violating scope is not ideal but it works
+              covariates_tmp[[change_number]][[changeType]] <<- obj[[i]]
+              
+              NULL
+            })
+            
+            DATAANALYSIS__covariates(covariates_tmp)
+            
+          }
+    })
+    
     output$DATAANALYSIS__covariate_options <- renderUI({
       
       out <- NULL
-
+      
       # Only display options if relevant
       covariates_tmp <- DATAANALYSIS__covariates()
       
       if(length(covariates_tmp)>0){
         
-       n_strata <- sum(sapply(covariates_tmp,function(x){x$stratify}))
-       
-       if(n_strata>0){
-         
-         if(input$DATAANALYSIS__method=="wins"){
-           
-           # TODO: Add IVW to WINS wrapper
-           
-           choices <- c("Maentel-Haenszel"="MH-type",
-                        "Unstratified"="unstratified",
-                        "Proportional"="wt.stratum1",
-                        "Proportional (observed events)"="wt.stratum2",
-                        "Equal Weights"="equal")
-         } else {
-           
-           # We should always be able to use inverse variance weighting
-           
-           choices <- c("Inverse Variance Weighting"="ivw",
-                        "Unstratified"="unstratified"
-                        )
-         }
-
-         out <- selectInput("DATAANALYSIS__covariate_strata_method",
-                            label = "Stratification method",
-                            choices = choices
-         )
-         
-       }
-       }
-
+        n_strata <- sum(sapply(covariates_tmp,function(x){x$stratify}))
+        
+        if(n_strata>0){
+          
+          if(input$DATAANALYSIS__method=="wins"){
             
+            # TODO: Add IVW to WINS wrapper
+            
+            choices <- c("Maentel-Haenszel"="MH-type",
+                         "Unstratified"="unstratified",
+                         "Proportional"="wt.stratum1",
+                         "Proportional (observed events)"="wt.stratum2",
+                         "Equal Weights"="equal")
+          } else {
+            
+            # We should always be able to use inverse variance weighting
+            
+            choices <- c("Inverse Variance Weighting"="ivw",
+                         "Unstratified"="unstratified"
+            )
+          }
+          
+          out <- selectInput("DATAANALYSIS__covariate_strata_method",
+                             label = "Stratification method",
+                             choices = choices
+          )
+          
+        }
+      }
+      
+      
       out
       
     })
@@ -484,6 +481,96 @@ list(
     
     # Observer for forcing a UI update
     DATAANALYSIS__force_surv_covar_UI_update <- reactiveVal(0)
+    
+    
+    
+    
+    # If an action was taken that causes structural change to 
+    # Preference list (i.e. added/removed/re-ordered details)
+    # Make these changes as neccesary 
+    
+    observe({
+      
+      req(SYMBOLIC_LINK__data_sheet())
+      data_sheet <- SYMBOLIC_LINK__data_sheet()
+      
+      input$DATAANALYSIS__surv_uiUpdateId_update
+      
+      
+      if (!is.null(input$DATAANALYSIS__surv_uiUpdateId)) {
+        
+        # TODO: this is only relevant for WINS method.
+        # We can probably cut this
+        currentMethod <- isolate(input$DATAANALYSIS__method)
+        
+        # Get preference list to modify
+        covariates_tmp <- isolate(DATAANALYSIS__surv_covariates())
+        
+        selectedId <- isolate(input$DATAANALYSIS__surv_uiUpdateId)
+        
+        #Update preference list structure (e.g. shuffle, delete, etc) and then signal to update UI elements
+        
+        if(selectedId == "DATAANALYSIS__add_surv_covariate"){
+          
+          # Add new preference component
+          covariates_tmp[[length(covariates_tmp)+1]] <- list(
+            var=colnames(data_sheet)[1]
+          )
+          DATAANALYSIS__surv_covariates(covariates_tmp)
+          
+        } else {
+          
+          # Pressed button is in the dynamic rows.
+          # Action taken depends on the button type
+          
+          actIdLabels <- c(
+            up="DATAANALYSIS__surv_component_up_",
+            down="DATAANALYSIS__surv_component_down_",
+            delete="DATAANALYSIS__surv_component_delete_"
+          )
+          
+          actType <- which(sapply(actIdLabels,grepl,x=selectedId))
+          actType <- names(actIdLabels)[actType]
+          if(length(actType)!=1){
+            stop("module-ANALYSIS: Something is wrong")
+          }
+          
+          change_number <- as.numeric(gsub(actIdLabels[actType],"",selectedId))
+          
+          if(is.na(change_number)) stop("unexpeced non-numeric value")
+          
+          if(actType == "up" & change_number > 1){
+            new_order <- 1:length(covariates_tmp)
+            
+            new_order[change_number] <- change_number-1
+            new_order[change_number-1] <- change_number
+            
+            covariates_tmp <- covariates_tmp[new_order]
+          } else if (actType == "down" & change_number < length(covariates_tmp)){
+            new_order <- 1:length(covariates_tmp)
+            
+            new_order[change_number] <- change_number+1
+            new_order[change_number+1] <- change_number
+            
+            covariates_tmp <- covariates_tmp[new_order]
+            
+          } else if(actType == "delete"){
+            covariates_tmp <- covariates_tmp[-change_number]
+          }
+          
+          DATAANALYSIS__surv_covariates(covariates_tmp)
+          
+        }
+        
+        # # Signal to UI to update
+        tmp <- isolate(DATAANALYSIS__force_surv_covar_UI_update())
+        tmp <- tmp+1
+        tmp <- tmp %% 2
+        DATAANALYSIS__force_surv_covar_UI_update(tmp)
+        
+      }
+    })
+    
     
     
     output$DATAANALYSIS__surv_covariates_components <- renderUI({
@@ -568,92 +655,33 @@ list(
     })
     
     
-    
-    # If an action was taken that causes structural change to 
-    # Preference list (i.e. added/removed/re-ordered details)
-    # Make these changes as neccesary 
-    
-    observe({
+    output$DATAANALYSIS__surv_covariate_options <- renderUI({
       
-      req(SYMBOLIC_LINK__data_sheet())
-      data_sheet <- SYMBOLIC_LINK__data_sheet()
       
-      input$DATAANALYSIS__surv_uiUpdateId_update
+      out <- NULL
       
-
-      if (!is.null(input$DATAANALYSIS__surv_uiUpdateId)) {
-        
-        # TODO: this is only relevant for WINS method.
-        # We can probably cut this
-        currentMethod <- isolate(input$DATAANALYSIS__method)
-        
-        # Get preference list to modify
-        covariates_tmp <- isolate(DATAANALYSIS__surv_covariates())
-        
-        selectedId <- isolate(input$DATAANALYSIS__surv_uiUpdateId)
-        
-        #Update preference list structure (e.g. shuffle, delete, etc) and then signal to update UI elements
-        
-        if(selectedId == "DATAANALYSIS__add_surv_covariate"){
-          
-          # Add new preference component
-          covariates_tmp[[length(covariates_tmp)+1]] <- list(
-            var=colnames(data_sheet)[1]
-          )
-          DATAANALYSIS__surv_covariates(covariates_tmp)
-          
-        } else {
-          
-          # Pressed button is in the dynamic rows.
-          # Action taken depends on the button type
-          
-          actIdLabels <- c(
-            up="DATAANALYSIS__surv_component_up_",
-            down="DATAANALYSIS__surv_component_down_",
-            delete="DATAANALYSIS__surv_component_delete_"
-          )
-          
-          actType <- which(sapply(actIdLabels,grepl,x=selectedId))
-          actType <- names(actIdLabels)[actType]
-          if(length(actType)!=1){
-            stop("module-ANALYSIS: Something is wrong")
-          }
-          
-          change_number <- as.numeric(gsub(actIdLabels[actType],"",selectedId))
-          
-          if(is.na(change_number)) stop("unexpeced non-numeric value")
-          
-          if(actType == "up" & change_number > 1){
-            new_order <- 1:length(covariates_tmp)
-            
-            new_order[change_number] <- change_number-1
-            new_order[change_number-1] <- change_number
-            
-            covariates_tmp <- covariates_tmp[new_order]
-          } else if (actType == "down" & change_number < length(covariates_tmp)){
-            new_order <- 1:length(covariates_tmp)
-            
-            new_order[change_number] <- change_number+1
-            new_order[change_number+1] <- change_number
-            
-            covariates_tmp <- covariates_tmp[new_order]
-            
-          } else if(actType == "delete"){
-            covariates_tmp <- covariates_tmp[-change_number]
-          }
-          
-          DATAANALYSIS__surv_covariates(covariates_tmp)
-          
-        }
-        
-        # # Signal to UI to update
-        tmp <- isolate(DATAANALYSIS__force_surv_covar_UI_update())
-        tmp <- tmp+1
-        tmp <- tmp %% 2
-        DATAANALYSIS__force_surv_covar_UI_update(tmp)
-        
+      # Only display options if covariates have been added
+      covariates_tmp <- DATAANALYSIS__surv_covariates()
+      
+      if(length(covariates_tmp)>0){
+        choices <- c("Unadjusted"="unadjusted",
+                     "IPCW"="ipcw",
+                     "IPCW (Covariate Dependent)"="covipcw"
+        )
+      } else {
+        choices <- c("Unadjusted"="unadjusted",
+                     "IPCW"="ipcw"
+        )
       }
+      
+      out <- selectInput("DATAANALYSIS__surv_covariate_strata_method",
+                         label = "Stratification method",
+                         choices =  choices
+      )
+      
+      out
     })
+    
     
     # Observer for changing DATAANALYSIS__surv_covariates in response to UI input
     # This doesn't require the same janky JS script hooks as there's not really
@@ -662,7 +690,7 @@ list(
       lapply(
         inputCollection(
           c("DATAANALYSIS__surv_component_var_"),
-          1:length(isolate(DATAANALYSIS__surv_covariates()))
+          1:(length(isolate(DATAANALYSIS__surv_covariates()))+1)
         ),
         function(x) input[[x]]
       ),{
@@ -713,37 +741,7 @@ list(
         }
       })
     
-    
-    output$DATAANALYSIS__surv_covariate_options <- renderUI({
-      
-      
-      write("BUG: stratification method resets methods on every time we run", stderr())
-      
-      
-      out <- NULL
-      
-      # Only display options if covariates have been added
-      covariates_tmp <- DATAANALYSIS__surv_covariates()
-      
-      if(length(covariates_tmp)>0){
-       choices <- c("Unadjusted"="unadjusted",
-                    "IPCW"="ipcw",
-                    "IPCW (Covariate Dependent)"="covipcw"
-                    )
-      } else {
-        choices <- c("Unadjusted"="unadjusted",
-                     "IPCW"="ipcw"
-        )
-      }
-      
-      out <- selectInput("DATAANALYSIS__surv_covariate_strata_method",
-                         label = "Stratification method",
-                         choices =  choices
-      )
-      
-      out
-    })
-    
+ 
     
     # Analysis Outputs ---------------------------------------------------------
    
@@ -1557,8 +1555,6 @@ list(
         endTags <- ""         
       }
       
-      print(textBody)
-      
       out <- sprintf("%s %s %s",frontTags,textBody,endTags)
       
       HTML(out)
@@ -1571,7 +1567,6 @@ list(
       reactive_force_results_update()
       results <- DATAANALYSIS__results()
       print(results)
-
 
       # Any reactives we might be interested in are defined here and should
       # be isolated

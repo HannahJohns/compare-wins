@@ -37,6 +37,16 @@ list(
     # was causing problems. This means that if we want to add new methods,
     # they need to be implemented as individual reactive objects.
     
+    
+    # Instead, we provide a bundled version of all preference objects for other
+    # modules to access
+    PREFDEF__preference_export <- reactive(
+      list(
+        heirarchical=PREFDEF__preferenceHeirarchy(),
+        list=PREFDEF__preferenceList()
+      )
+    )
+    
     PREFDEF__preferenceHeirarchy <- reactiveVal(list())
     PREFDEF__preferenceList <- PREFDEF__preference_sheet <- reactive({
                                 if (is.null(input$PREFDEF__preference_file)) {
@@ -55,19 +65,14 @@ list(
                               })
     
     
-    # Instead, we provide a bundled version of all preference objects for other
-    # modules to access
-    PREFDEF__preference_export <- reactive(
-      list(
-        heirarchical=PREFDEF__preferenceHeirarchy(),
-        list=PREFDEF__preferenceList()
-      )
-    )
     
     # If an action was taken that causes structural change to 
     # Preference list (i.e. added/removed/re-ordered details)
     # Make these changes as neccesary 
     observe({
+      # 
+      # print("=============================")
+      # print("PREFDEF structural change")
       
       req(SYMBOLIC_LINK__data_sheet())
       data_sheet <- SYMBOLIC_LINK__data_sheet()
@@ -76,6 +81,9 @@ list(
       
       if (!is.null(input$PREFDEF__uiUpdateId)) {
        
+        print(input$PREFDEF__uiUpdateId)
+        
+        
         # Get preference list to modify
         preferenceList_tmp <- isolate(PREFDEF__preferenceHeirarchy())
          
@@ -92,8 +100,7 @@ list(
               indicator=colnames(data_sheet)[1],
               direction=">"
             )
-            PREFDEF__preferenceHeirarchy(preferenceList_tmp)
-           
+
         } else {
           
           # Pressed button is in the dynamic rows.
@@ -134,8 +141,10 @@ list(
             preferenceList_tmp <- preferenceList_tmp[-change_number]
           }
           
-          PREFDEF__preferenceHeirarchy(preferenceList_tmp)
         }
+        
+        print(preferenceList_tmp)
+        PREFDEF__preferenceHeirarchy(preferenceList_tmp)
         
         # Signal to UI to update
         tmp <- isolate(PREFDEF__force_UI_update())
@@ -144,76 +153,12 @@ list(
         PREFDEF__force_UI_update(tmp)
       }
     })
-    
-    # Observer for changing PREFDEF__preferenceHeirarchy in response to UI input
-    
-    observeEvent(
-      lapply(
-        inputCollection(
-          c("PREFDEF__component_type_",
-            "PREFDEF__component_var_",
-            "PREFDEF__component_tau_",
-            "PREFDEF__component_censor_",
-            "PREFDEF__component_direction_"
-            ),
-          1:length(isolate(PREFDEF__preferenceHeirarchy()))
-        ),
-        function(x) input[[x]]
-      ),{
-        
-        # Get a list of all relevant components
-        inputNames <- inputCollection(
-          c("PREFDEF__component_type_",
-            "PREFDEF__component_var_",
-            "PREFDEF__component_tau_",
-            "PREFDEF__component_censor_",
-            "PREFDEF__component_direction_"
-          ),
-          1:length(isolate(PREFDEF__preferenceHeirarchy()))
-        )
-        
-        
-        obj <- lapply(inputNames,function(x){input[[x]]})
-        names(obj) <- inputNames
-        
-        preferenceList_tmp <- isolate(PREFDEF__preferenceHeirarchy())
-        
-        if(length(preferenceList_tmp)>0){
-          
-          lapply(inputNames, function(i){
-            
-            # Extract out what the name "i" corresponds to
-            varIdLabels <- c(
-              type="PREFDEF__component_type_",
-              var="PREFDEF__component_var_",
-              tau="PREFDEF__component_tau_",
-              indicator="PREFDEF__component_censor_",
-              direction="PREFDEF__component_direction_"
-            )
-            
-            changeType <- which(sapply(varIdLabels,grepl,x=i))
-            changeType <- names(varIdLabels)[changeType]
-            if(length(changeType)!=1){
-              stop("Something is wrong")
-            }
-            
-            change_number <- as.numeric(gsub(varIdLabels[changeType],"",i))
-            
-            # Violating scope is not ideal but it works
-            preferenceList_tmp[[change_number]][[changeType]] <<- obj[[i]]
-            
-            NULL
-          })
-          
-          PREFDEF__preferenceHeirarchy(preferenceList_tmp)
-          
-        }
-        
-    })
-
 
     # UI output for preference list 
     output$PREFDEF__components <- renderUI({
+      
+      print("=============================")
+      print("PREFDEF structural change")
       
       # Trigger UI change
       req(SYMBOLIC_LINK__data_sheet())
@@ -327,6 +272,78 @@ list(
 
       out
     })
+    
+    # Observer for changing PREFDEF__preferenceHeirarchy in response to UI input
+    
+    observeEvent(
+      lapply(
+        inputCollection(
+          c("PREFDEF__component_type_",
+            "PREFDEF__component_var_",
+            "PREFDEF__component_tau_",
+            "PREFDEF__component_censor_",
+            "PREFDEF__component_direction_"
+          ),
+          1:(length(isolate(PREFDEF__preferenceHeirarchy()))+1)
+        ),
+        function(x) input[[x]]
+      ),{
+        
+        print("=============================")
+        print("PREFDEF value change")
+        
+        # Get a list of all relevant components
+        inputNames <- inputCollection(
+          c("PREFDEF__component_type_",
+            "PREFDEF__component_var_",
+            "PREFDEF__component_tau_",
+            "PREFDEF__component_censor_",
+            "PREFDEF__component_direction_"
+          ),
+          1:length(isolate(PREFDEF__preferenceHeirarchy()))
+        )
+        
+        
+        obj <- lapply(inputNames,function(x){input[[x]]})
+        names(obj) <- inputNames
+        
+        preferenceList_tmp <- isolate(PREFDEF__preferenceHeirarchy())
+        
+        if(length(preferenceList_tmp)>0){
+          
+          lapply(inputNames, function(i){
+            
+            # Extract out what the name "i" corresponds to
+            varIdLabels <- c(
+              type="PREFDEF__component_type_",
+              var="PREFDEF__component_var_",
+              tau="PREFDEF__component_tau_",
+              indicator="PREFDEF__component_censor_",
+              direction="PREFDEF__component_direction_"
+            )
+            
+            changeType <- which(sapply(varIdLabels,grepl,x=i))
+            changeType <- names(varIdLabels)[changeType]
+            if(length(changeType)!=1){
+              stop("Something is wrong")
+            }
+            
+            change_number <- as.numeric(gsub(varIdLabels[changeType],"",i))
+            
+            # Violating scope is not ideal but it works
+            preferenceList_tmp[[change_number]][[changeType]] <<- obj[[i]]
+            
+            NULL
+          })
+          
+          print(preferenceList_tmp)
+          
+          PREFDEF__preferenceHeirarchy(preferenceList_tmp)
+          
+        }
+        
+      })
+    
     
     
     output$PREFDEF__tbl <- DT::renderDT({
