@@ -1405,7 +1405,7 @@ list(
       } else {
         textBody <-  paste(textBody,
                            sprintf(", where all-to-all preferences are defined using a %s approach",
-                                   preference.method
+                                   c(heirarchical="heirarchical (rule) based",list="list based")[preference.method]
                                    ))
         
         preferences <- SYMBOLIC_LINK__preference_export()
@@ -1450,7 +1450,9 @@ list(
       if(!is.null(effect.measure)){
         textBody <-  sprintf("%s. Difference in outcome preference is summarised using the %s statistic",
                              textBody,
-                             effect.measure
+                             c(winRatio="Win Ratio",
+                               winOdds="Win Odds",
+                               netBenefit="Net Benefit")[effect.measure]
         )
       }
       
@@ -1548,7 +1550,7 @@ list(
       # max_iter <- isolate(input$DATAANALYSIS__pim_estimator_max_iter)
       
       if(methods_changed()){
-        frontTags <- "<font color='#000000'>" # This really should be CSS
+        frontTags <- "<font color='#0000ff'>" # This really should be CSS
         endTags <- "</font>"
       } else {
         frontTags <- ""
