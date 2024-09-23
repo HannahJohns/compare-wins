@@ -45,8 +45,6 @@ module_server_expr <- str2expression(module_server_expr)
 
 # print(module_server_expr)
 
-
-
 # Convenience functions used across multiple modules
 
 # Gets a list of reactive inputs based on names and an index

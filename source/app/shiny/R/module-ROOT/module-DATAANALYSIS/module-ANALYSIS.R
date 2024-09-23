@@ -1319,8 +1319,8 @@ list(
         if(n_errors+n_warnings>0){
           
           
-          print(errorList)
-          print(warningList)
+          # print(errorList)
+          # print(warningList)
           
           messageTitle <- ifelse(n_errors>0,"Error","Warning")
           
@@ -1360,7 +1360,7 @@ list(
       } # End if not null arm
       
       write(sprintf("Analysis finished. Returning results to reactives."), stderr())
-      print(out)
+      # print(out)
       DATAANALYSIS__results(out)
       
       write(sprintf("Done"), stderr())
@@ -1457,6 +1457,13 @@ list(
       }
       
       statistical.method <- input$DATAANALYSIS__method
+      
+      if(statistical.method=="wins"){
+        statistical.method <- "Win Statistics, provided by the WINS package"
+      } else if (statistical.method=="pim"){
+        statistical.method <- "Probabilistic Index Models, provided by the pim package"
+      }
+      
       if(!is.null(statistical.method)){
         textBody <-  sprintf("%s, calculated using %s",
                              textBody,
@@ -1568,7 +1575,7 @@ list(
 
       reactive_force_results_update()
       results <- DATAANALYSIS__results()
-      print(results)
+      # print(results)
 
       # Any reactives we might be interested in are defined here and should
       # be isolated
@@ -1595,7 +1602,7 @@ list(
         }
       })
       stratum <- do.call("c",stratum)
-      print(stratum)
+      # print(stratum)
 
 
       # Need to get a list of strata
@@ -1618,13 +1625,13 @@ list(
         }
       })
       covariates_effect <- do.call("c",covariates_effect)
-      print(covariates_effect)
+      # print(covariates_effect)
 
 
       adjust.method <- isolate(input$DATAANALYSIS__surv_covariate_strata_method)
       if(is.null(adjust.method)) adjust.method <- "unadjusted"
 
-      print("Rendering UI output")
+      # print("Rendering UI output")
 
       out <- list()
 
@@ -1746,7 +1753,7 @@ list(
         }
       })
       stratum <- do.call("c",stratum)
-      print(stratum)
+      # print(stratum)
 
       covariates_effect <- lapply(isolate(DATAANALYSIS__covariates()), function(x){
         if(x[["stratify"]]){
@@ -1756,7 +1763,7 @@ list(
         }
       })
       covariates_effect <- do.call("c",covariates_effect)
-      print(covariates_effect)
+      # print(covariates_effect)
 
 
       # print(isolate(DATAANALYSIS__surv_covariates()))
@@ -1819,7 +1826,7 @@ list(
         }
       })
       covariates_effect <- do.call("c",covariates_effect)
-      print(covariates_effect)
+      # print(covariates_effect)
 
 
       # print(isolate(DATAANALYSIS__surv_covariates()))

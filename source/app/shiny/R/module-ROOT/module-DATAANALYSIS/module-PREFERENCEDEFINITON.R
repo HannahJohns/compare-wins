@@ -81,7 +81,7 @@ list(
       
       if (!is.null(input$PREFDEF__uiUpdateId)) {
        
-        print(input$PREFDEF__uiUpdateId)
+        # print(input$PREFDEF__uiUpdateId)
         
         
         # Get preference list to modify
@@ -143,7 +143,7 @@ list(
           
         }
         
-        print(preferenceList_tmp)
+        # print(preferenceList_tmp)
         PREFDEF__preferenceHeirarchy(preferenceList_tmp)
         
         # Signal to UI to update
@@ -157,8 +157,8 @@ list(
     # UI output for preference list 
     output$PREFDEF__components <- renderUI({
       
-      print("=============================")
-      print("PREFDEF structural change")
+      # print("=============================")
+      # print("PREFDEF structural change")
       
       # Trigger UI change
       req(SYMBOLIC_LINK__data_sheet())
@@ -289,8 +289,8 @@ list(
         function(x) input[[x]]
       ),{
         
-        print("=============================")
-        print("PREFDEF value change")
+        # print("=============================")
+        # print("PREFDEF value change")
         
         # Get a list of all relevant components
         inputNames <- inputCollection(
@@ -336,7 +336,7 @@ list(
             NULL
           })
           
-          print(preferenceList_tmp)
+          # print(preferenceList_tmp)
           
           PREFDEF__preferenceHeirarchy(preferenceList_tmp)
           
