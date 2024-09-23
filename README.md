@@ -1,2 +1,2 @@
-# clinician-gpc
+# compare-wins
 A clinician-friendly point-and-click interface for analysing medical research data using the Generalised Pairwise Comparisons approach
