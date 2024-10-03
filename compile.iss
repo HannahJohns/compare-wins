@@ -4,7 +4,7 @@
 #define MyAppName "Compare WINS"
 #define MyAppVersion "0.3.2"
 #define MyAppPublisher "Australian Stroke Alliance"
-#define MyAppURL "https://github.com/HannahJohns/clinician-gpc"
+#define MyAppURL "https://github.com/HannahJohns/compare-wins"
 #define MyAppExeName "run.bat"
 
 [Setup]
@@ -23,7 +23,7 @@ DisableProgramGroupPage=yes
 ; Remove the following line to run in administrative install mode (install for all users.)
 PrivilegesRequired=lowest
 OutputDir=D:\repositories\clinician-gpc\releases
-OutputBaseFilename=ClinicianGPC_setup
+OutputBaseFilename=CompareWins_setup
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern

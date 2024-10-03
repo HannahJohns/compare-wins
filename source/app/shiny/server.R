@@ -57,6 +57,7 @@ inputCollection <- function(input_names,input_index){
 server <- function(input, output, session) {
   
   session$onSessionEnded(function() {
+    cat("Session ended",file=stderr())
     stopApp()
   })
   

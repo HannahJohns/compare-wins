@@ -69,7 +69,11 @@ list(
           )
   ),
   hr(),
-  tags$h3("Credits")
+  tags$h3("Credits"),
+  "This research was funded in whole or part by the National Health and Medical Research Council Grant No. 1171422",
+  tags$a(href="https://www.monash.edu/medicine/sphpm/austrim/home",
+         target="_blank",
+         "The Australian Trials Methodology Research Network")
   ),
   server_element = substitute({})
 )
