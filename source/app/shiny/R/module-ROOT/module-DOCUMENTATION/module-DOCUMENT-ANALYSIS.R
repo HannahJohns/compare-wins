@@ -4,45 +4,54 @@ list(
   module_label = "Conducting Analysis",
   imports=NULL,
   ui_element = fluidPage(
+    
     fluidRow(
       column(width=6,
-             "Generalised Pairwise Comparisons refers to a family of statistical
-              methods, each with their own limitations.
-              COMPARE WINS supports the following methods:"
-             ,
-             tags$ul(
-               tags$li(tags$b("Win Statistics")),
-               tags$li(tags$b("Probabilistic Index Models"))
-             )
-             )
+        "Generalised Pairwise Comparisons are a family of statistical methods,
+        not a single individual approach. COMPARE WINS provides a point-and-click
+        interface to several statistical methods within the Generalised Pairwise Comparisons
+        family. 
+        
+        "        
+      )
     ),
-    fluidRow(bsCollapse(bsCollapsePanel(title="Win Statistics",
-                                        
-                                        tags$h3("Overview"),
-                                        
-                                        "Supported by the",
-                                        tags$a(href="https://www.doi.org/10.32614/CRAN.package.pim",target="_blank","WINS"),
-                                        "package",
-                                        
-                                        tags$h3("Limitations"),
-                                        
-                                        tags$h3("Managing Time-To-Event Data")
-                                        
-                                        
-    ))
+    fluidRow(
+      tags$h3("Methods supported by COMPARE WINS"),
     ),
-    fluidRow(bsCollapse(bsCollapsePanel(title="Probabilistic Index Models",
-                                        
-                                        tags$h3("Overview"),
-                                        
-                                        "Supported by the",
-                                        tags$a(href="https://www.doi.org/10.32614/CRAN.package.pim",target="_blank","pim"),
-                                        "package",
-                                        
-                                        tags$h3("Limitations")
-                                        
-                                        
-    ))
+    fluidRow(
+    style = "height:500px;",  
+    column(width=12,
+           navlistPanel(
+             tabPanel(title="Win Statistics",
+                      absolutePanel(style="overflow: auto;", height="500px",width="100%",
+                                    tags$h3("Overview"),
+                                    
+                                    "Supported by the",
+                                    tags$a(href="https://www.doi.org/10.32614/CRAN.package.pim",target="_blank","WINS"),
+                                    "package",
+                                    
+                                    tags$h3("Limitations"),
+                                    
+                                    tags$h3("Managing Time-To-Event Data")
+                                    
+                      )
+             ),
+             tabPanel(title="Probabilistic Index Models",
+                      absolutePanel(style="overflow: auto;",
+                                
+                      tags$h3("Overview"),
+                      
+                      "Supported by the",
+                      tags$a(href="https://www.doi.org/10.32614/CRAN.package.pim",target="_blank","pim"),
+                      "package",
+                      
+                      tags$h3("Limitations")    
+                                    
+                      )
+             )
+           )
+    )         
+                         
     ),
     fluidRow(
       column(width=6,
