@@ -156,7 +156,7 @@ list(
             "PREFDEF__component_censor_",
             "PREFDEF__component_direction_"
             ),
-          1:length(isolate(PREFDEF__preferenceHeirarchy()))
+          1:(length(isolate(PREFDEF__preferenceHeirarchy()))+1)
         ),
         function(x) input[[x]]
       ),{

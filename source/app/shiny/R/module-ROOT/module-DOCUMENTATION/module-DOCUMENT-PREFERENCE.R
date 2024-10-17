@@ -8,12 +8,8 @@ list(
     column(width=6,
            "The Generalised Pairwise Comparisons approach to data analysis
            requires a formalised method for determining which combination
-           of outcomes is considered to be preferable.
-           COMPARE WINS supports the following approaches:",
-           tags$ul(
-             tags$li(tags$b("Heirarchy"),"-based approach, i.e. the traditional Win Ratio analysis method"),
-             tags$li(tags$b("List"),"-based approach, which allows for trade-offs between outcome components")
-           )
+           of outcomes is considered to be preferable. COMPARE WINS supports
+           several approaches that have been proposed in medical literature."
     )
   ),
   fluidRow(
@@ -27,6 +23,10 @@ list(
                title="Heirarchy",
                absolutePanel(style="overflow: auto;", height="500px",width="100%",
                              tags$h3("Overview"),
+                             
+                             "The Heirarchical approach to defining ",
+                             
+                             
                              "This preference definition requires...",
                              
                              tags$h3("How Preference is Determined for Individual Outcomes"),
