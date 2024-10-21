@@ -4,7 +4,7 @@
 # https://stackoverflow.com/questions/40168801/r-shiny-last-clicked-button-id
 
 list(
-  module_name = "",
+  module_name = "PREFDEF",
   module_label = "Define Preferences",
   imports = c("DATAIMPORT__data_sheet"="SYMBOLIC_LINK__data_sheet"),
   ui_element = fluidPage(

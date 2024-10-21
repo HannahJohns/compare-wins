@@ -44,7 +44,7 @@ list(
     )
   ),
   server_element = substitute({
-   
+    ### Server Elements #################################################
     
     output$DATAANALYSIS__effect_measure_ui <- renderUI({
       
@@ -165,6 +165,7 @@ list(
                           )
           )
         ),
+        fluidRow(uiOutput("DATAANALYSIS__warning_example")),
         fluidRow(actionButton("DATAANALYSIS__analysis_go","Analyse!"))
       )
       
@@ -185,6 +186,17 @@ list(
       
       
       
+    })
+    
+    
+    output$DATAANALYSIS__warning_example <- renderUI({
+      bsCollapse(id = "power_effect_pairs_help",
+                 bsCollapsePanel("Warning",
+                                 "This will be a context-dependent warning for methods.",
+                                 "It should only show if methods appear like they could be",
+                                 "counterintuitive/biased/etc",
+                                 style="danger")
+      )
     })
     
     ### Dynamic Analysis Options #################################################
