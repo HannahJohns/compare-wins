@@ -11,7 +11,6 @@ list(
         not a single individual approach. COMPARE WINS provides a point-and-click
         interface to several statistical methods within the Generalised Pairwise Comparisons
         family. 
-        
         "        
       )
     ),

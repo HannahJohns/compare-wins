@@ -50,7 +50,7 @@ module_server_expr <- str2expression(module_server_expr)
 # Gets a list of reactive inputs based on names and an index
 inputCollection <- function(input_names,input_index){
   c(t(outer(input_names,input_index,paste0)))
-}
+  }
 
 
 # Define server logic required to draw a histogram
