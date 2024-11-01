@@ -47,8 +47,8 @@ list(
             radioButtons("SAMPLESIZE__sensitivity_x",
                          label = "As a function of",
                          choices=c("Sample Size"="sampleSize",
-                                   "Effect Size",
-                                   "Proportion of ties"
+                                   "Effect Size"="effectSize",
+                                   "Proportion of ties"="prop_ties"
                                    ),
                          )
             ),
@@ -56,7 +56,7 @@ list(
             numericInput("SAMPLESIZE__sensitivity_start",
                          label = "From",
                          value=100),
-            numericInput("SAMPLESIZE__sensitivity_start",
+            numericInput("SAMPLESIZE__sensitivity_end",
                          label = "To",
                          value=1000)
      ),
@@ -67,9 +67,14 @@ list(
                                      value=100)
        )
      )
+   ),
+   fluidRow(
+     plotOutput("SAMPLESIZE__result_sampleSizePlot")
    )
   ),
   server_element = substitute({
+    
+    
     
     # These sample sizes are in total. Divide by 2 to get per-group sample size
     yu_power_generic <- function(p_win,p_loss,p_tie, k=0.5, alpha, power){
@@ -114,21 +119,32 @@ list(
       c(wins=wins,losses=prop_wl-wins,ties=ties)
     }
     
-    output$SAMPLESIZE__result_sampleSize <- renderText({
+  
+    
+    SAMPLESIZE__reactive_N <- reactive({
       
-     
-
       wlt <- get_wlt(effect = input$SAMPLESIZE__effectSizeType,
                      ES = input$SAMPLESIZE__effectSize,
                      ties = input$SAMPLESIZE__prop_ties
       )
-
+      
       N <- yu_power_generic(p_win = wlt["wins"],
                             p_loss =  wlt["losses"],
                             p_tie =  wlt["ties"],
                             alpha = input$SAMPLESIZE__alpha,
                             power = input$SAMPLESIZE__power,
                             k=0.5)
+    })
+    
+    output$SAMPLESIZE__result_sampleSize <- renderText({
+      
+      
+      wlt <- get_wlt(effect = input$SAMPLESIZE__effectSizeType,
+                     ES = input$SAMPLESIZE__effectSize,
+                     ties = input$SAMPLESIZE__prop_ties
+      )
+      
+      N <- SAMPLESIZE__reactive_N()
       
       # Round up to nearest whole number
       N <- ceiling(N)
@@ -165,86 +181,213 @@ list(
     }) 
     
     
-    # TODO: Build plot based on the selected inputs above
     
-    # output$SAMPLESIZE__result_sampleSizePlot <- renderPlot({
-    #   
-    #   input <- list(SAMPLESIZE__effectSizeType="winRatio",
-    #                 SAMPLESIZE__effectSize = 1.5,
-    #                 SAMPLESIZE__prop_ties=0.1,
-    #                 SAMPLESIZE__prop_ties_error=0.01,
-    #                 SAMPLESIZE__alpha=0.05,
-    #                 SAMPLESIZE__power=0.8)
-    #   
-    #   effectName <- c("winRatio"="Win Ratio",
-    #                   "winOdds"="Win Odds",
-    #                   "netBenefit"="Net Benefit")[input$SAMPLESIZE__effectSizeType]
-    #   
-    #   
-    #   ties_bounds <- input$SAMPLESIZE__prop_ties + ((-1):1) * input$SAMPLESIZE__prop_ties_error
-    #   ties_bounds[ties_bounds<0] <- 0
-    #   ties_bounds[ties_bounds>1] <- 1
-    #   
-    #   
-    #   # Get range of effect sizes to plot
-    #   multiplier <- 1.5 # Should be an input
-    #   
-    #   ES <- input$SAMPLESIZE__effectSize
-    #   
-    #   # If we need to log transform
-    #   logTransform <- (effectName %in% c("Win Ratio", "Win Odds"))
-    #   
-    #   if(logTransform) ES <- log(ES)
-    #   
-    #   ES_Small <- ES/multiplier
-    #   ES_Large <- ES*multiplier
-    #   
-    #   ES_seq <- unique(c(
-    #     seq(min(ES_Small,ES_Large),ES,length.out=10),
-    #     ES,
-    #     seq(ES,max(ES_Small,ES_Large),length.out=10) 
-    #   ))
-    #   
-    #   if(logTransform){
-    #     ES <- exp(ES)
-    #     ES_seq <- exp(ES_seq)
-    #   }
-    #   
-    #   tmpdf <- expand.grid(
-    #     ES = ES_seq,
-    #     ties = input$SAMPLESIZE__prop_ties+ties_bounds
-    #   )
-    #   
-    #   tmpdf$N <- sapply(1:nrow(tmpdf),function(i){
-    #     
-    #    
-    #     
-    #     wlt <- get_wlt(effect = input$SAMPLESIZE__effectSizeType,
-    #                    ES = tmpdf[i,"ES"],
-    #                    ties = tmpdf[i,"ties"]
-    #     )
-    #     
-    #     N <- yu_power_generic(p_win = wlt["wins"],
-    #                           p_loss =  wlt["losses"],
-    #                           p_tie =  wlt["ties"],
-    #                           alpha = input$SAMPLESIZE__alpha,
-    #                           power = input$SAMPLESIZE__power,
-    #                           k=0.5)
-    #   })
-    #   
-    #   tmpdf$provided_value <- tmpdf$ES==input$SAMPLESIZE__effectSize & tmpdf$ties==input$SAMPLESIZE__prop_ties
-    #   
-    #   tmpdf
-    #   
-    #   tmpdf[which(tmpdf$provided_value),]
-    #   
-    #   ggplot(tmpdf, aes(x=ES,y=N,linetype=factor(ties)))+
-    #     geom_line()+
-    #     geom_hline()
-    #  
-    #   
-    #   
-    # }) 
+    # Generic solver for power analysis.
+    # Flag what to solve for based on what value is provided
+    # as NA and return it.
+    
+    tmp <- as.list(parGrid[i,])
+    attach(tmp)
+    fill_power_blank <- function(effect,effectSize,prop_ties,alpha,power,sampleSize){
+      
+      get_N <- function(effect,
+                        ES,
+                        ties,
+                        alpha,
+                        power){
+        
+        
+        wlt <- get_wlt(effect = effect,
+                       ES = ES,
+                       ties = ties
+        )
+        
+        N <- yu_power_generic(p_win = wlt["wins"],
+                              p_loss =  wlt["losses"],
+                              p_tie =  wlt["ties"],
+                              alpha = alpha,
+                              power = power,
+                              k=0.5)
+        
+        unname(N)
+        
+      }
+      
+      
+      all_args <- c(ES=effectSize,ties=prop_ties,alpha=alpha,power=power,sampleSize=sampleSize)
+      
+      which_na <- is.na(all_args)
+      which_na <- names(which_na[which_na])
+      
+      args <- as.list(all_args[names(all_args)!=which_na])
+      args[["effect"]] <- input$SAMPLESIZE__effectSizeType
+      
+      
+      if(is.na(sampleSize)){
+        
+        args <- args[which(names(args)!="sampleSize")]
+        out <- do.call("get_N",args)
+        
+      } else {
+        
+        # Root finding function - fit whatever we're varying
+        # to reach target sample size
+        
+        rootFun <- function(toVary,which_na,args){
+          
+          toVary <<- toVary
+          
+          args[[which_na]] <- toVary
+          
+          target_N <- args[["sampleSize"]]        
+          args <- args[which(names(args)!="sampleSize")]
+          
+          target_N-do.call("get_N",args)
+
+        }
+        
+        # Get starting intervals.
+        
+        # NOTE: The power formula we're using appears to be unstable
+        # for extreme values of power (<0.01). This shouldn't
+        # cause problems in practice, but it makes root finding annoying
+        # To resolve this, provide a battery of values to each interval
+        # and then take the largest and smallest values.
+        
+        if(which_na=="ES"){
+          
+          if(args[["effect"]] == "netBenefit") {
+            
+            interval <- seq(-0.999,0.999,length.out=1000)
+            
+          } else {
+            interval <- exp(seq(-0.999,0.999,length.out=1000))
+          }
+          
+        } else if(which_na=="ties"){
+          
+          interval <- seq(0.001,0.99,length.out=1000)
+          
+        } else if(which_na=="alpha"){
+          
+          interval <- seq(0.001,0.99,length.out=1000)
+          
+        } else if(which_na=="power"){
+          
+          interval <- seq(0.001,0.99,length.out=1000)
+        } 
+        
+        
+        interval_f <- sapply(interval,rootFun,which_na=which_na,args=args)
+        
+        interval <- c(
+          interval[interval_f==max(interval_f)],
+          interval[interval_f==min(interval_f)]
+        )
+        interval <- sort(interval)
+        
+        out <- uniroot(rootFun,interval = interval,which_na=which_na,args=args,
+        tol = .Machine$double.eps)$root
+        
+      }
+      
+      names(out) <- which_na
+      out
+      
+    }
+    
+    
+    output$SAMPLESIZE__result_sampleSizePlot <- renderPlot({
+
+      # input <- list(
+      # 
+      #   SAMPLESIZE__effectSizeType = c("winRatio",
+      #                                  "winOdds",
+      #                                  "netBenefit")[1],
+      # 
+      #   SAMPLESIZE__effectSize = 1.2,
+      # 
+      #   SAMPLESIZE__prop_ties = 0,
+      # 
+      #   SAMPLESIZE__alpha=0.05,
+      #   SAMPLESIZE__power = 0.8,
+      # 
+      #   SAMPLESIZE__sensitivity_y = c("power","sampleSize")[1],
+      #   SAMPLESIZE__sensitivity_x = c("sampleSize","effectSize","prop_ties")[2],
+      #   SAMPLESIZE__sensitivity_start=1.1,
+      #   SAMPLESIZE__sensitivity_end=1.5,
+      #   SAMPLESIZE__sensitivity_N = 100
+      # )
+
+      # browser()
+      parGrid_main_result <- parGrid <- list(
+                   effect= input$SAMPLESIZE__effectSizeType,
+                   effectSize = input$SAMPLESIZE__effectSize,
+                   prop_ties = input$SAMPLESIZE__prop_ties,
+                   alpha=input$SAMPLESIZE__alpha,
+                   power=input$SAMPLESIZE__power,
+                   sampleSize=unname(SAMPLESIZE__reactive_N())
+                  )
+      
+      parGrid[[input$SAMPLESIZE__sensitivity_y]] <- NA
+      parGrid[[input$SAMPLESIZE__sensitivity_x]] <- seq(input$SAMPLESIZE__sensitivity_start,
+                                                        input$SAMPLESIZE__sensitivity_end,
+                                                        length.out=20) 
+      
+      parGrid <- do.call("expand.grid",parGrid)
+      
+      parGrid[,input$SAMPLESIZE__sensitivity_y] <- sapply(1:nrow(parGrid),function(i){
+        
+        out <- tryCatch({
+          do.call("fill_power_blank",as.list(parGrid[i,]))
+        }, error=function(e){NA})  
+
+        unname(out)
+      })
+      
+      
+      parGrid <- rbind(parGrid,do.call("data.frame",parGrid_main_result))
+      
+      parGrid$y <-  parGrid[,input$SAMPLESIZE__sensitivity_y]
+      parGrid$x <-  parGrid[,input$SAMPLESIZE__sensitivity_x]
+      
+      parGrid <- parGrid[order(parGrid$x),]
+      
+      hline <- switch(input$SAMPLESIZE__sensitivity_y,
+                      power=input$SAMPLESIZE__power,
+                      sampleSize=SAMPLESIZE__reactive_N())
+      
+      vline <- switch(input$SAMPLESIZE__sensitivity_x,
+                      sampleSize=SAMPLESIZE__reactive_N(),
+                      effectSize=input$SAMPLESIZE__effectSize,
+                      prop_ties=input$SAMPLESIZE__prop_ties,
+                      power=input$SAMPLESIZE__power
+                      )
+      
+      ylabel <- c(power="Power",sampleSize="Sample Size")[input$SAMPLESIZE__sensitivity_y]
+      xlabel <- c(sampleSize="Sample Size",
+                  effectSize="Effect Size",
+                  prop_ties="Proportion of ties")[input$SAMPLESIZE__sensitivity_x]
+      
+      
+      if(xlabel=="Effect Size") {
+        xlabel <- c("winRatio"="Win Ratio",
+                    "winOdds"="Win Odds",
+                    "netBenefit"="Net Benefit")[input$SAMPLESIZE__effectSizeType]
+      }
+      
+      ggplot(parGrid,aes(x=x,y=y))+
+        geom_line()+
+        geom_point(size=2)+
+        geom_hline(yintercept = hline,color="dark red", linetype="dashed")+
+        geom_vline(xintercept = vline,color="dark red", linetype="dashed")+
+        labs(x=xlabel,
+             y=ylabel)+
+        theme_bw()
+      
+      
+      
+    })
    
   }) # End server
 )
