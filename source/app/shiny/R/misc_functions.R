@@ -31,6 +31,14 @@
 # method <- "pim"
 
 
+
+
+
+
+
+
+
+
 ################################################################################
 
 # Wrapper function for interfacing with underlying stats software.
@@ -498,8 +506,298 @@ wins_wrapper <- function(data, outcomes, arm, levels,
 }
 
 
-analysis_results_to_wr_df <- function(df,df_overall){
+# Custom Plot functions---------------
 
+## Percentile-Percentile plot function---------------
+
+#' Visualise stochastic dominance using percentile_percentile plot
+#' @param x0 Count of outcomes in control group (including zeros)
+#' @param x1 Count of outcomes in intervention group (including zeros)
+#' @param ties_method Should ties be dropped or split?
+#' @param tie_display Should ties be split diagonally or horizontally?
+#' @param show_proportions Show proportions in vertical/horizontal bar charts
+#' @param show_dichot_ci Show show dichotomised 95% CI for odds ratios on plot
+#' @param show_cOR Show show curve corresponding to common odds ratio
+#' @param show_labels Show show labels, if provided
+#' @returns A ggplot object
+pp_plot <- function(x0,x1,
+                    ranks,
+                    labels=NULL,
+                    ties_method,
+                    tie_display="horizontal",
+                    show_proportions = F,
+                    show_dichot_ci = T,
+                    show_cOR = T,
+                    show_labels = T
+) {
+  
+  p0 <- x0 / sum(x0)
+  p1 <- x1 / sum(x1)
+  
+  if(is.null(labels)){
+    labels <- rep("",length(x0))
+  }
+  
+  oddsCurve <- function(x,r) r*x/((r-1)*x + 1)
+  oddsCurve_x <- function(x,r) r/((r-1)*x+1)^2 # First derivative with respect to x
+  
+  posx <- data.frame(rank0 = ranks, xmin=cumsum(p0)-p0,xmax=cumsum(p0))
+  posy <- data.frame(rank1 = ranks, ymin=cumsum(p1)-p1,ymax=cumsum(p1))
+  
+  posx <- lapply(1:nrow(posx),function(i){posx[i,]})
+  posy <- lapply(1:nrow(posy),function(i){posy[i,]})
+  
+  posGrid <- expand.grid(posx,posy)
+  
+  as.data.frame(cbind(
+    do.call("rbind",posGrid[[1]]),
+    do.call("rbind",posGrid[[2]])
+  )) -> posGrid
+  
+  xlabel <- data.frame(labels=ranks, xpos = unique(apply(posGrid[,c("xmin","xmax")],1,mean)))
+  ylabel <- data.frame(labels=ranks, ypos = unique(apply(posGrid[,c("ymin","ymax")],1,mean)))
+  
+  if(ties_method=="split"){
+    splitProp <- 0.5
+  } else if (ties_method =="drop"){
+    splitProp <- outer(p0,p1)
+    splitProp <- sum(splitProp[lower.tri(splitProp)])/(sum(splitProp[lower.tri(splitProp)])+sum(splitProp[upper.tri(splitProp)]))
+  }
+  
+  tieGrid <- posGrid[which(posGrid$rank0==posGrid$rank1),]
+  
+  splitTieDf <- do.call("rbind",lapply(1:nrow(tieGrid),function(i){
+    
+    dx <- tieGrid[i,"xmax"]-tieGrid[i,"xmin"]
+    dy <- tieGrid[i,"ymax"]-tieGrid[i,"ymin"]
+    
+    if(tie_display =="diagonal"){
+      #   Split ties diagonally
+      if(splitProp >= 0.5){
+        
+        tmp <- rbind(
+          c(tieGrid[i,"xmin"],tieGrid[i,"ymax"]-dy*sqrt(2*(1-splitProp))),
+          c(tieGrid[i,"xmin"]+dx*sqrt(2*(1-splitProp)),tieGrid[i,"ymax"])
+        )
+        
+      } else {
+        
+        tmp <- rbind(
+          c(tieGrid[i,"xmax"]-dx*sqrt(2*(splitProp)),tieGrid[i,"ymin"]),
+          c(tieGrid[i,"xmax"],tieGrid[i,"ymin"]+dy*sqrt(2*(splitProp)))
+        )
+      }
+    } else if(tie_display =="horizontal"){
+      # Split ties horizontally
+      
+      tmp <- rbind(
+        c(tieGrid[i,"xmin"],tieGrid[i,"ymin"]+splitProp*(tieGrid[i,"ymax"]-tieGrid[i,"ymin"])),
+        c(tieGrid[i,"xmax"],tieGrid[i,"ymin"]+splitProp*(tieGrid[i,"ymax"]-tieGrid[i,"ymin"]))
+      )
+    }
+    
+    
+    colnames(tmp) <- c("x","y")
+    cbind(rank=tieGrid[i,"rank0"]+c(0.2,0.3),tmp)
+    
+  }))
+  
+  
+  posGrid <- do.call("rbind",lapply(1:nrow(tieGrid),function(i){
+    cbind(rank=tieGrid[i,"rank0"]+c(0.1,0.4),
+          rbind(
+            c(x=tieGrid[i,"xmin"],y=tieGrid[i,"ymin"]),
+            c(x=tieGrid[i,"xmax"],y=tieGrid[i,"ymax"])
+          )
+    )
+  }))
+  
+  allPoints <- cbind(as.data.frame(rbind(posGrid,splitTieDf)))
+  
+  allPoints <- allPoints[order(allPoints$rank),]
+  
+  allPoints_area <- rbind(allPoints,
+                          c(mRS=max(allPoints$rank)+1,
+                            x=1,
+                            y=0))
+  
+  # Estimate confidence intervals without adjustments
+  
+  tieGrid$estimate <- tieGrid$ymax*(1-tieGrid$xmax)/(tieGrid$xmax*(1-tieGrid$ymax))
+  
+  # Get halfwidth, etc. based on wald normal approximation
+  tieGrid$halfWidth <- qnorm(1-0.05/2) * sqrt(1/(sum(x0)*tieGrid$xmax)+
+                                                1/(sum(x1)*tieGrid$ymax)+
+                                                1/(sum(x0)*(1-tieGrid$xmax))+
+                                                1/(sum(x1)*(1-tieGrid$ymax)))
+  
+  tieGrid$lower <- exp(log(tieGrid$estimate) - tieGrid$halfWidth)
+  tieGrid$upper <- exp(log(tieGrid$estimate) + tieGrid$halfWidth)
+  
+  do.call("rbind",lapply(1:(nrow(tieGrid)-1),function(i){
+    
+    x_mid <- tieGrid[i,"xmax"]
+    y_mid <- oddsCurve(x_mid,tieGrid[i,"estimate"])
+    
+    # For each point, find intersection between lower/upper odds curves
+    # and a straight line that's normal to the curve at that point
+    
+    # We can just rootfind this
+    
+    x_lower <- uniroot(function(x_lower){
+      
+      m <- -1/oddsCurve_x(x_mid,tieGrid[i,"estimate"])
+      
+      normalLineVal <- oddsCurve(x_mid,tieGrid[i,"estimate"]) + m*(x_lower-x_mid)
+      
+      CurveVal <- oddsCurve(x_lower,tieGrid[i,"lower"])
+      
+      CurveVal - normalLineVal
+      
+    },interval = c(0,1))$root
+    
+    y_lower <- oddsCurve(x_lower,tieGrid[i,"lower"])
+    
+    x_upper <- uniroot(function(x_upper){
+      
+      m <- -1/oddsCurve_x(x_mid,tieGrid[i,"estimate"])
+      
+      normalLineVal <- oddsCurve(x_mid,tieGrid[i,"estimate"]) + m*(x_upper-x_mid)
+      
+      CurveVal <- oddsCurve(x_upper,tieGrid[i,"upper"])
+      
+      CurveVal - normalLineVal
+      
+    },interval = c(1e-8,1-1e-8))$root
+    
+    y_upper <- oddsCurve(x_upper,tieGrid[i,"upper"])
+    
+    c(i=i,
+      odds_lower=unname(tieGrid[i,"lower"]),
+      x_lower=unname(x_lower),
+      y_lower=unname(y_lower),
+      odds_mid=unname(tieGrid[i,"estimate"]),
+      x_mid=unname(x_mid),
+      y_mid=unname(y_mid),
+      odds_upper=unname(tieGrid[i,"upper"]),
+      x_upper=unname(x_upper),
+      y_upper=unname(y_upper)
+    )
+    
+  }) ) -> odds
+  
+  odds <- as.data.frame(odds)
+  
+  
+  rbind(
+    tieGrid %>%
+      mutate(weight=xmax-xmin, group=1) %>%
+      select(rank=rank0,group,weight=weight),
+    tieGrid %>%
+      mutate(weight=ymax-ymin, group=0) %>%
+      select(rank=rank0,group,weight=weight)
+  ) %>% 
+    mutate(weight=weight*ifelse(group==1,sum(x1),sum(x0)),
+               rank=factor(rank)) -> propodds_df
+  
+  
+  suppressWarnings({polr(rank~group,weights = propodds_df$weight,data=propodds_df,Hess = T)}) %>%
+    (function(x){
+      out <- c(coef(x),confint(profile(x)))
+      names(out) <- c("estimate","lower","upper")
+      out
+    }) %>% exp() -> commonOdds
+  
+  commonOdds_df <- data.frame(qc = seq(0,1,length.out=201))
+  commonOdds_df$estimate <- oddsCurve(commonOdds_df$qc,commonOdds["estimate"])
+  commonOdds_df$lower <- oddsCurve(commonOdds_df$qc,commonOdds["lower"])
+  commonOdds_df$upper <- oddsCurve(commonOdds_df$qc,commonOdds["upper"])
+  
+  ggp <- ggplot()+
+    scale_x_continuous(labels=scales::percent_format())+
+    scale_y_continuous(labels=scales::percent_format())+
+    labs(y="Intervention",
+         x="Control",
+         fill="Rank"
+    )+
+    theme_bw()+
+    theme(
+      panel.grid = element_blank(),
+      aspect.ratio = 1
+    )+
+    geom_polygon(data=allPoints_area,
+                 fill="blue",alpha=0.2,
+                 aes(x=x,y=y))+
+    geom_path(data=allPoints,aes(x=x,y=y))+
+    geom_rect(data=tieGrid,
+              fill="gray",
+              alpha=0.1,
+              color="#999999",linetype="dashed",
+              aes(xmin=xmin,xmax=xmax,ymin=ymin,ymax=ymax,
+                  group=paste(rank0,rank1)
+              )
+    )+
+    geom_abline(slope=1,intercept=0, color="dark red",size=0,linetype="dashed")+
+    geom_point(data=odds,
+               aes(x=x_mid,y=y_mid))+
+    geom_rect(data=tieGrid,
+              ymin=-0.1,ymax=0,color="black",
+              aes(xmin=xmin,xmax=xmax,fill=factor(rank0)))
+  
+  if(show_proportions){
+    ggp <- ggp + 
+      geom_text(data=tieGrid,
+                aes(x=(xmin+xmax)/2,y=-0.05,label=sprintf("%0.2f",xmax-xmin)))+
+      geom_text(data=tieGrid,
+                aes(y=(ymin+ymax)/2,x=-0.05,label=sprintf("%0.2f",ymax-ymin)))+
+      # TODO: Build custom scale function 
+      scale_fill_brewer(palette="RdYlGn",direction=-1)
+  }
+  
+  if(show_cOR){
+    ggp <- ggp+
+      geom_ribbon(data=commonOdds_df,aes(x=qc,ymin=lower,ymax=upper),fill="dark blue",alpha=0.2)+
+      geom_line(data=commonOdds_df,aes(x=qc,y=estimate),color="blue")
+  }
+  
+  
+  if(show_dichot_ci){
+    ggp <- ggp+geom_segment(data=odds,
+                            aes(x=x_lower,y=y_lower,
+                                xend=x_upper,yend=y_upper,
+                                group=i))
+  }
+  
+  
+  if(show_labels & !is.null(labels)){
+    
+    # Drop the final value's label, we don't show
+    # things at the start or end
+    
+    labeldf <- cbind(odds,labels=labels[1:nrow(odds)])
+    labeldf <- labeldf[grepl("[:alnum:]+",labeldf$labels),]
+    
+    if(nrow(labeldf)){
+      ggp <- ggp + 
+        geom_label(data=labeldf,
+                   aes(x=x_lower+0.005,y=y_lower,
+                       label=labels),
+                   hjust=0, size=3)
+    }
+    
+  }
+  
+  ggp
+  
+}
+
+
+## Win ratio plot function ---------------
+
+# Function for helping build win ratio plot
+
+analysis_results_to_wr_df <- function(df,df_overall){
+  
   
   df %>% arrange(level) -> df
   
@@ -558,9 +856,6 @@ analysis_results_to_wr_df <- function(df,df_overall){
   
 }
 
-
-
-# Win ratio plot function
 winRatioPlot <- function(df,tie_handling=NA,neutral_point=1,estimate_name="",
                          level="level", level_names="level_names", win_inherit="win_inherit", win="win", tie="tie",
                          loss="loss", loss_inherit="loss_inherit",

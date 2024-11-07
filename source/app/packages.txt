@@ -8,6 +8,7 @@
 jsonlite
 
 # if deploying shiny based applications:
+MASS
 rlang
 tidyverse
 patchwork
@@ -18,3 +19,4 @@ DT
 WINS
 pim
 simsalapar
+rankinPlot

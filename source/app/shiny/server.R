@@ -1,4 +1,5 @@
 
+library(MASS)
 
 library(shiny)
 library(DT)
@@ -7,9 +8,11 @@ library(simsalapar)
 library(pim)
 library(WINS)
 
+library(patchwork)
+library(rankinPlot)
+
 library(rlang)
 library(tidyverse)
-library(patchwork)
 
 source("R/misc_functions.R")
 

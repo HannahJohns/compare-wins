@@ -204,6 +204,7 @@ list(
     # Covariate Control ---------------------------------------------------------
     
     DATAANALYSIS__covariates <- reactiveVal(list())
+    
   
     # Observer for forcing a UI update
     DATAANALYSIS__force_covar_UI_update <- reactiveVal(0)
@@ -1169,9 +1170,6 @@ list(
           # data_sheet <- data
           
           
-          
-          
-          
           # The easiest way to get list-based analysis working is to treat it
           # like it's heirarchical with only a single facet.
           
@@ -1194,19 +1192,23 @@ list(
           }
           
           # Set up outcomes as if it were a singular continuous outcome facet
-
+          
           #TODO: This is is dangerous and needs some checks added
           data_sheet <- left_join(
             data_sheet,
             preference_list
           )
           
+          
+          # With the data sheet built and before analysis, update any reactives that depend on it
+          DATAANALYSIS__xtab( table(data_sheet[,arm],data_sheet[,newRankName])[levels,] )
+          
           outcomes <- list( list(
             type="numeric",
             var=newRankName,
             tau=0,
             indicator=NULL,
-            direction=">"
+            direction="<" # Rank 1 is best
           ))
       
           # if(statistical.method != "debug"){
@@ -1706,6 +1708,12 @@ list(
         }
 
       }
+      
+      
+      if(input$SYMBOLIC_LINK__preferenceType=="list"){
+        out[[length(out)+1]] <- fluidRow(plotOutput("DATAANALYSIS__wins_output_ranked_plot",height = "500px"))
+      }
+      
 
       if(!is.null(results$decomposed_estimate)){
 
@@ -1720,8 +1728,10 @@ list(
         out[[length(out)+1]] <- bsCollapsePanel("Details",
                                   fluidRow(tableOutput("DATAANALYSIS__wins_output_decompsition"))
                                 )
-
       }
+      
+      
+      
 
       if(!is.null(DATAANALYSIS__results()$estimates_by_stratum)){
 
@@ -1746,8 +1756,59 @@ list(
     })
 
     
+    #### Rank-based elements ---------------------
+
+    DATAANALYSIS__xtab <- reactiveVal({})
     
-    #### DATAANALYSIS__wins_output_decompsition_plot-----
+    output$DATAANALYSIS__wins_output_ranked_plot <- renderPlot({
+      xtab <- DATAANALYSIS__xtab()
+      
+      if(sum(xtab)>0){
+        
+        effect.measure <- input$DATAANALYSIS__effect_measure
+        
+        ties_method <- ifelse(effect.measure %in% c("winOdds","netBenefit"),"split","drop")
+        
+        dimnames(xtab) <- list(arm=rownames(xtab),
+                               rank=colnames(xtab))
+        
+        x1 <- xtab[1,]
+        x0 <- xtab[2,]
+        ranks <- as.numeric(colnames(xtab))
+        
+        plot_percentile <- pp_plot(x0,x1,ranks=ranks,
+                labels=NULL,
+                ties_method=ties_method,
+                tie_display="horizontal",
+                show_proportions = F,
+                show_dichot_ci = T,
+                show_cOR = T,
+                show_labels = T
+        )
+        
+        # Reverse the direction of xtab to get control on bottom, match with
+        # the percentile-percentile plot.
+        
+        # This is hacky but it works
+        
+        plot_grotta <- grottaBar(xtab[nrow(xtab):1,],groupName = "arm",scoreName="rank",
+                                             colorScheme="custom",printNumbers = "none") +
+          guides(fill="none")+
+          theme(legend.position = "right")+
+          labs(fill="Rank")
+        
+        out <- plot_percentile + plot_grotta + plot_layout(guides = "collect")
+        
+      } else {
+        out <- NULL
+      }
+      
+      out
+     
+    })
+    
+    #### Heirarchical elements ---------------------
+    ##### DATAANALYSIS__wins_output_decompsition_plot-----
     output$DATAANALYSIS__wins_output_decompsition_plot <- renderPlot({
 
       df <- DATAANALYSIS__results()$decomposed_estimate
@@ -1821,11 +1882,10 @@ list(
 
     })
     
-    #### DATAANALYSIS__wins_output_by_stratum_decompsition_plot-----
+    ##### DATAANALYSIS__wins_output_by_stratum_decompsition_plot-----
     output$DATAANALYSIS__wins_output_by_stratum_decompsition_plot <- renderPlot({
 
       results <- DATAANALYSIS__results()$estimates_by_stratum
-
 
       # Need to know about stratification, covariate adjustments, etc
       # for rendering plot with appropriate tags
