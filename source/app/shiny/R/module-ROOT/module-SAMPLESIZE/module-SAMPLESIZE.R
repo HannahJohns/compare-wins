@@ -186,8 +186,6 @@ list(
     # Flag what to solve for based on what value is provided
     # as NA and return it.
     
-    tmp <- as.list(parGrid[i,])
-    attach(tmp)
     fill_power_blank <- function(effect,effectSize,prop_ties,alpha,power,sampleSize){
       
       get_N <- function(effect,
@@ -320,7 +318,7 @@ list(
       # )
 
       # browser()
-      parGrid_main_result <- parGrid <- list(
+      parGrid <- list(
                    effect= input$SAMPLESIZE__effectSizeType,
                    effectSize = input$SAMPLESIZE__effectSize,
                    prop_ties = input$SAMPLESIZE__prop_ties,
@@ -328,6 +326,7 @@ list(
                    power=input$SAMPLESIZE__power,
                    sampleSize=unname(SAMPLESIZE__reactive_N())
                   )
+      parGrid_main_result <- parGrid
       
       parGrid[[input$SAMPLESIZE__sensitivity_y]] <- NA
       parGrid[[input$SAMPLESIZE__sensitivity_x]] <- seq(input$SAMPLESIZE__sensitivity_start,
