@@ -39,7 +39,10 @@ list(
                            ),
                    tags$li(tags$em("Conducting Analysis:"),
                            "A detailed guide on statistical methods"
-                           )
+                           ),
+                   tags$li(tags$em("Conducting Analysis:"),
+                           "A detailed guide on sample size estimation"
+                   )
                  )
                )
              ),
@@ -59,6 +62,20 @@ list(
                          tags$li(tags$em("Analysis:"),
                                  "Run statistical analysis using the loaded data and outcome preference definition"
                                  )
+                       )
+               )
+             ),
+             tags$ul(
+               tags$li("The",
+                       tags$em("Power Analysis and Sample Size Estimation"),
+                       "tab provides :",
+                       tags$ul(
+                         tags$li(tags$em("Direct Pairs Approach:"),
+                                 "Estimate sample size based on the number of expected wins, losses and ties"
+                         ),
+                         tags$li(tags$em("Effect Size Approach:"),
+                                 "Estimate sample size based on an estimated effect size"
+                         )
                        )
                )
              )

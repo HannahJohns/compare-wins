@@ -1711,7 +1711,7 @@ list(
       
       
       if(input$SYMBOLIC_LINK__preferenceType=="list"){
-        out[[length(out)+1]] <- fluidRow(plotOutput("DATAANALYSIS__wins_output_ranked_plot",height = "500px"))
+        out[[length(out)+1]] <- fluidRow(plotOutput("DATAANALYSIS__wins_output_ranked_plot",height = "600px"))
       }
       
 
@@ -1781,8 +1781,8 @@ list(
                 ties_method=ties_method,
                 tie_display="horizontal",
                 show_proportions = F,
-                show_dichot_ci = T,
-                show_cOR = T,
+                show_dichot_ci = F,
+                show_cOR = F,
                 show_labels = T
         )
         

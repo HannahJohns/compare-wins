@@ -1,50 +1,50 @@
 # Demonstration of a module to be loaded into shiny
 list(
-  module_name = "SAMPLESIZE",
+  module_name = "SAMPLESIZE_EFFECT",
   module_label = "Sample Size Estimation",
   imports=NULL,
   ui_element = fluidPage(
     fluidRow(
      column(width=3,
-            radioButtons("SAMPLESIZE__effectSizeType",
+            radioButtons("SAMPLESIZE_EFFECT__effectSizeType",
                          label = "Effect Size",
                          choices=c("Win Ratio"="winRatio",
                                    "Win Odds"="winOdds",
                                    "Net Benefit"="netBenefit"))
      ),
      column(width=3,
-            numericInput("SAMPLESIZE__effectSize",
+            numericInput("SAMPLESIZE_EFFECT__effectSize",
                          label = "Effect Size",
                          value=0),
-            numericInput("SAMPLESIZE__prop_ties",
+            numericInput("SAMPLESIZE_EFFECT__prop_ties",
                          label = "Proportion of tied observations",
                          value=0)
             ),
      column(width=3,
-            numericInput("SAMPLESIZE__alpha",
+            numericInput("SAMPLESIZE_EFFECT__alpha",
                          label = "Type-I error rate",
                          value=0.05),
-            numericInput("SAMPLESIZE__power",
+            numericInput("SAMPLESIZE_EFFECT__power",
                          label = "Target Power",
                          value=0.8),
      )
    ),
    tags$hr(),
    fluidRow(
-     textOutput("SAMPLESIZE__result_sampleSize")
+     textOutput("SAMPLESIZE_EFFECT__result_sampleSize")
    ),
    tags$hr(),
    tags$h4("Sensitivity Analysis"),
    fluidRow(
      column(width=3,
-            radioButtons("SAMPLESIZE__sensitivity_y",
+            radioButtons("SAMPLESIZE_EFFECT__sensitivity_y",
                          label = "Show change in",
                          choices = c("Power"="power",
                                      "Sample Size"="sampleSize")
                          )
      ),
      column(width=3,
-            radioButtons("SAMPLESIZE__sensitivity_x",
+            radioButtons("SAMPLESIZE_EFFECT__sensitivity_x",
                          label = "As a function of",
                          choices=c("Sample Size"="sampleSize",
                                    "Effect Size"="effectSize",
@@ -53,98 +53,51 @@ list(
                          )
             ),
      column(width=2,
-            numericInput("SAMPLESIZE__sensitivity_start",
+            numericInput("SAMPLESIZE_EFFECT__sensitivity_start",
                          label = "From",
                          value=100),
-            numericInput("SAMPLESIZE__sensitivity_end",
+            numericInput("SAMPLESIZE_EFFECT__sensitivity_end",
                          label = "To",
                          value=1000)
      ),
      column(width=2,
-       conditionalPanel("input.SAMPLESIZE__sensitivity_y=='power' && input.SAMPLESIZE__sensitivity_x!='sampleSize'",
-                        numericInput("SAMPLESIZE__sensitivity_N",
+       conditionalPanel("input.SAMPLESIZE_EFFECT__sensitivity_y=='power' && input.SAMPLESIZE_EFFECT__sensitivity_x!='sampleSize'",
+                        numericInput("SAMPLESIZE_EFFECT__sensitivity_N",
                                      label = "Fix Sample size at:",
                                      value=100)
        )
      )
    ),
    fluidRow(
-     plotOutput("SAMPLESIZE__result_sampleSizePlot")
+     plotOutput("SAMPLESIZE_EFFECT__result_sampleSizePlot")
    )
   ),
   server_element = substitute({
     
-    
-    
-    # These sample sizes are in total. Divide by 2 to get per-group sample size
-    yu_power_generic <- function(p_win,p_loss,p_tie, k=0.5, alpha, power){
+    SAMPLESIZE_EFFECT__reactive_N <- reactive({
       
-      logwr = log(p_win/p_loss)
-      
-      s2 = 4*(1+p_tie)/(3*k*(1-k)*(1-p_tie))
-      
-      N = s2 * (qnorm(1-alpha/2) + qnorm(power))^2 / (logwr^2)
-      
-      return(N)
-    }
-    
-    #' Converts effect size and assumed proportion of ties
-    #' to win/loss/tie proportions
-    get_wlt <- function(effect,ES,ties){
-      
-      # Just uniroot() this.
-      # It's cheap to run, handles error checking for us,
-      # and extendable to other effect sizes as they're proposed/developed
-      
-      prop_wl <- 1-ties
-      
-      wins <- tryCatch({uniroot(function(wins){
-        
-        losses = prop_wl-wins
-        
-        this_ES <- switch (effect,
-                           "winRatio" = wins/losses,
-                           "winOdds" = (wins+0.5*ties)/(losses+0.5*ties),
-                           "netBenefit" = wins-losses
-        )
-        
-        this_ES-ES
-      },
-      interval = c(0,prop_wl),
-      tol = .Machine$double.eps
-      )$root
-      },
-      error = function(e){NA})
-      
-      c(wins=wins,losses=prop_wl-wins,ties=ties)
-    }
-    
-  
-    
-    SAMPLESIZE__reactive_N <- reactive({
-      
-      wlt <- get_wlt(effect = input$SAMPLESIZE__effectSizeType,
-                     ES = input$SAMPLESIZE__effectSize,
-                     ties = input$SAMPLESIZE__prop_ties
+      wlt <- get_wlt(effect = input$SAMPLESIZE_EFFECT__effectSizeType,
+                     ES = input$SAMPLESIZE_EFFECT__effectSize,
+                     ties = input$SAMPLESIZE_EFFECT__prop_ties
       )
       
       N <- yu_power_generic(p_win = wlt["wins"],
                             p_loss =  wlt["losses"],
                             p_tie =  wlt["ties"],
-                            alpha = input$SAMPLESIZE__alpha,
-                            power = input$SAMPLESIZE__power,
+                            alpha = input$SAMPLESIZE_EFFECT__alpha,
+                            power = input$SAMPLESIZE_EFFECT__power,
                             k=0.5)
     })
     
-    output$SAMPLESIZE__result_sampleSize <- renderText({
+    output$SAMPLESIZE_EFFECT__result_sampleSize <- renderText({
       
       
-      wlt <- get_wlt(effect = input$SAMPLESIZE__effectSizeType,
-                     ES = input$SAMPLESIZE__effectSize,
-                     ties = input$SAMPLESIZE__prop_ties
+      wlt <- get_wlt(effect = input$SAMPLESIZE_EFFECT__effectSizeType,
+                     ES = input$SAMPLESIZE_EFFECT__effectSize,
+                     ties = input$SAMPLESIZE_EFFECT__prop_ties
       )
       
-      N <- SAMPLESIZE__reactive_N()
+      N <- SAMPLESIZE_EFFECT__reactive_N()
       
       # Round up to nearest whole number
       N <- ceiling(N)
@@ -152,7 +105,7 @@ list(
       # Formatting to report back
       effectName <- c("winRatio"="Win Ratio",
                       "winOdds"="Win Odds",
-                      "netBenefit"="Net Benefit")[input$SAMPLESIZE__effectSizeType]
+                      "netBenefit"="Net Benefit")[input$SAMPLESIZE_EFFECT__effectSizeType]
       
       # Strip trailing zeros
       
@@ -172,10 +125,10 @@ list(
               100*wlt["losses"],
               100*wlt["ties"],
               effectName,
-              strip_zeroes(input$SAMPLESIZE__effectSize),
+              strip_zeroes(input$SAMPLESIZE_EFFECT__effectSize),
               N,
-              strip_zeroes(input$SAMPLESIZE__power),
-              strip_zeroes(input$SAMPLESIZE__alpha)
+              strip_zeroes(input$SAMPLESIZE_EFFECT__power),
+              strip_zeroes(input$SAMPLESIZE_EFFECT__alpha)
               )
       
     }) 
@@ -218,7 +171,7 @@ list(
       which_na <- names(which_na[which_na])
       
       args <- as.list(all_args[names(all_args)!=which_na])
-      args[["effect"]] <- input$SAMPLESIZE__effectSizeType
+      args[["effect"]] <- input$SAMPLESIZE_EFFECT__effectSizeType
       
       
       if(is.na(sampleSize)){
@@ -295,47 +248,47 @@ list(
     }
     
     
-    output$SAMPLESIZE__result_sampleSizePlot <- renderPlot({
+    output$SAMPLESIZE_EFFECT__result_sampleSizePlot <- renderPlot({
 
       # input <- list(
       # 
-      #   SAMPLESIZE__effectSizeType = c("winRatio",
+      #   SAMPLESIZE_EFFECT__effectSizeType = c("winRatio",
       #                                  "winOdds",
       #                                  "netBenefit")[1],
       # 
-      #   SAMPLESIZE__effectSize = 1.2,
+      #   SAMPLESIZE_EFFECT__effectSize = 1.2,
       # 
-      #   SAMPLESIZE__prop_ties = 0,
+      #   SAMPLESIZE_EFFECT__prop_ties = 0,
       # 
-      #   SAMPLESIZE__alpha=0.05,
-      #   SAMPLESIZE__power = 0.8,
+      #   SAMPLESIZE_EFFECT__alpha=0.05,
+      #   SAMPLESIZE_EFFECT__power = 0.8,
       # 
-      #   SAMPLESIZE__sensitivity_y = c("power","sampleSize")[1],
-      #   SAMPLESIZE__sensitivity_x = c("sampleSize","effectSize","prop_ties")[2],
-      #   SAMPLESIZE__sensitivity_start=1.1,
-      #   SAMPLESIZE__sensitivity_end=1.5,
-      #   SAMPLESIZE__sensitivity_N = 100
+      #   SAMPLESIZE_EFFECT__sensitivity_y = c("power","sampleSize")[1],
+      #   SAMPLESIZE_EFFECT__sensitivity_x = c("sampleSize","effectSize","prop_ties")[2],
+      #   SAMPLESIZE_EFFECT__sensitivity_start=1.1,
+      #   SAMPLESIZE_EFFECT__sensitivity_end=1.5,
+      #   SAMPLESIZE_EFFECT__sensitivity_N = 100
       # )
 
       # browser()
       parGrid <- list(
-                   effect= input$SAMPLESIZE__effectSizeType,
-                   effectSize = input$SAMPLESIZE__effectSize,
-                   prop_ties = input$SAMPLESIZE__prop_ties,
-                   alpha=input$SAMPLESIZE__alpha,
-                   power=input$SAMPLESIZE__power,
-                   sampleSize=unname(SAMPLESIZE__reactive_N())
+                   effect= input$SAMPLESIZE_EFFECT__effectSizeType,
+                   effectSize = input$SAMPLESIZE_EFFECT__effectSize,
+                   prop_ties = input$SAMPLESIZE_EFFECT__prop_ties,
+                   alpha=input$SAMPLESIZE_EFFECT__alpha,
+                   power=input$SAMPLESIZE_EFFECT__power,
+                   sampleSize=unname(SAMPLESIZE_EFFECT__reactive_N())
                   )
       parGrid_main_result <- parGrid
       
-      parGrid[[input$SAMPLESIZE__sensitivity_y]] <- NA
-      parGrid[[input$SAMPLESIZE__sensitivity_x]] <- seq(input$SAMPLESIZE__sensitivity_start,
-                                                        input$SAMPLESIZE__sensitivity_end,
+      parGrid[[input$SAMPLESIZE_EFFECT__sensitivity_y]] <- NA
+      parGrid[[input$SAMPLESIZE_EFFECT__sensitivity_x]] <- seq(input$SAMPLESIZE_EFFECT__sensitivity_start,
+                                                        input$SAMPLESIZE_EFFECT__sensitivity_end,
                                                         length.out=20) 
       
       parGrid <- do.call("expand.grid",parGrid)
       
-      parGrid[,input$SAMPLESIZE__sensitivity_y] <- sapply(1:nrow(parGrid),function(i){
+      parGrid[,input$SAMPLESIZE_EFFECT__sensitivity_y] <- sapply(1:nrow(parGrid),function(i){
         
         out <- tryCatch({
           do.call("fill_power_blank",as.list(parGrid[i,]))
@@ -347,32 +300,32 @@ list(
       
       parGrid <- rbind(parGrid,do.call("data.frame",parGrid_main_result))
       
-      parGrid$y <-  parGrid[,input$SAMPLESIZE__sensitivity_y]
-      parGrid$x <-  parGrid[,input$SAMPLESIZE__sensitivity_x]
+      parGrid$y <-  parGrid[,input$SAMPLESIZE_EFFECT__sensitivity_y]
+      parGrid$x <-  parGrid[,input$SAMPLESIZE_EFFECT__sensitivity_x]
       
       parGrid <- parGrid[order(parGrid$x),]
       
-      hline <- switch(input$SAMPLESIZE__sensitivity_y,
-                      power=input$SAMPLESIZE__power,
-                      sampleSize=SAMPLESIZE__reactive_N())
+      hline <- switch(input$SAMPLESIZE_EFFECT__sensitivity_y,
+                      power=input$SAMPLESIZE_EFFECT__power,
+                      sampleSize=SAMPLESIZE_EFFECT__reactive_N())
       
-      vline <- switch(input$SAMPLESIZE__sensitivity_x,
-                      sampleSize=SAMPLESIZE__reactive_N(),
-                      effectSize=input$SAMPLESIZE__effectSize,
-                      prop_ties=input$SAMPLESIZE__prop_ties,
-                      power=input$SAMPLESIZE__power
+      vline <- switch(input$SAMPLESIZE_EFFECT__sensitivity_x,
+                      sampleSize=SAMPLESIZE_EFFECT__reactive_N(),
+                      effectSize=input$SAMPLESIZE_EFFECT__effectSize,
+                      prop_ties=input$SAMPLESIZE_EFFECT__prop_ties,
+                      power=input$SAMPLESIZE_EFFECT__power
                       )
       
-      ylabel <- c(power="Power",sampleSize="Sample Size")[input$SAMPLESIZE__sensitivity_y]
+      ylabel <- c(power="Power",sampleSize="Sample Size")[input$SAMPLESIZE_EFFECT__sensitivity_y]
       xlabel <- c(sampleSize="Sample Size",
                   effectSize="Effect Size",
-                  prop_ties="Proportion of ties")[input$SAMPLESIZE__sensitivity_x]
+                  prop_ties="Proportion of ties")[input$SAMPLESIZE_EFFECT__sensitivity_x]
       
       
       if(xlabel=="Effect Size") {
         xlabel <- c("winRatio"="Win Ratio",
                     "winOdds"="Win Odds",
-                    "netBenefit"="Net Benefit")[input$SAMPLESIZE__effectSizeType]
+                    "netBenefit"="Net Benefit")[input$SAMPLESIZE_EFFECT__effectSizeType]
       }
       
       ggplot(parGrid,aes(x=x,y=y))+

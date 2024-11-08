@@ -506,6 +506,53 @@ wins_wrapper <- function(data, outcomes, arm, levels,
 }
 
 
+# Power Analysis ----------------------------------------------------
+
+
+# These sample sizes are in total. Divide by 2 to get per-group sample size
+yu_power_generic <- function(p_win,p_loss,p_tie, k=0.5, alpha, power){
+  
+  logwr = log(p_win/p_loss)
+  
+  s2 = 4*(1+p_tie)/(3*k*(1-k)*(1-p_tie))
+  
+  N = s2 * (qnorm(1-alpha/2) + qnorm(power))^2 / (logwr^2)
+  
+  return(N)
+}
+
+
+#' Converts effect size and assumed proportion of ties
+#' to win/loss/tie proportions
+get_wlt <- function(effect,ES,ties){
+  
+  # Just uniroot() this.
+  # It's cheap to run, handles error checking for us,
+  # and extendable to other effect sizes as they're proposed/developed
+  
+  prop_wl <- 1-ties
+  
+  wins <- tryCatch({uniroot(function(wins){
+    
+    losses = prop_wl-wins
+    
+    this_ES <- switch (effect,
+                       "winRatio" = wins/losses,
+                       "winOdds" = (wins+0.5*ties)/(losses+0.5*ties),
+                       "netBenefit" = wins-losses
+    )
+    
+    this_ES-ES
+  },
+  interval = c(0,prop_wl),
+  tol = .Machine$double.eps
+  )$root
+  },
+  error = function(e){NA})
+  
+  c(wins=wins,losses=prop_wl-wins,ties=ties)
+}
+
 # Custom Plot functions---------------
 
 ## Percentile-Percentile plot function---------------
@@ -617,7 +664,7 @@ pp_plot <- function(x0,x1,
   allPoints <- allPoints[order(allPoints$rank),]
   
   allPoints_area <- rbind(allPoints,
-                          c(mRS=max(allPoints$rank)+1,
+                          c(rank=max(allPoints$rank)+1,
                             x=1,
                             y=0))
   
@@ -737,12 +784,15 @@ pp_plot <- function(x0,x1,
                   group=paste(rank0,rank1)
               )
     )+
-    geom_abline(slope=1,intercept=0, color="dark red",size=0,linetype="dashed")+
+    geom_abline(slope=1,intercept=0, color="dark red",size=1,linetype="dashed")+
     geom_point(data=odds,
                aes(x=x_mid,y=y_mid))+
     geom_rect(data=tieGrid,
               ymin=-0.1,ymax=0,color="black",
-              aes(xmin=xmin,xmax=xmax,fill=factor(rank0)))
+              aes(xmin=xmin,xmax=xmax,fill=factor(rank0)))+
+    geom_rect(data=tieGrid,
+              xmin=-0.1,xmax=0,color="black",
+              aes(ymin=ymin,ymax=ymax,fill=factor(rank1)))  
   
   if(show_proportions){
     ggp <- ggp + 

@@ -15,6 +15,11 @@ list(
       )
     ),
     fluidRow(
+      column(width=6,
+             tags$h3("Effect Size Measures")
+      )
+    ),
+    fluidRow(
       tags$h3("Methods supported by COMPARE WINS"),
     ),
     fluidRow(
@@ -51,11 +56,6 @@ list(
            )
     )         
                          
-    ),
-    fluidRow(
-      column(width=6,
-      tags$h3("Interpreting Results")
-      )
     )
   ),
   server_element = substitute({})

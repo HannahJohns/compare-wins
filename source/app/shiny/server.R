@@ -46,14 +46,12 @@ write("Done!", stderr())
 module_server_expr <- paste(module_server_expr,collapse="\n")
 module_server_expr <- str2expression(module_server_expr)
 
-# print(module_server_expr)
-
 # Convenience functions used across multiple modules
 
 # Gets a list of reactive inputs based on names and an index
 inputCollection <- function(input_names,input_index){
   c(t(outer(input_names,input_index,paste0)))
-  }
+}
 
 
 # Define server logic required to draw a histogram
