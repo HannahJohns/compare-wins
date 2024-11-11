@@ -10,7 +10,7 @@ source("R/constructor_functions.R")
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
-  
+  withMathJax(),
   tags$head(tags$style(
     HTML(".shiny-notification {
               height: 100px;

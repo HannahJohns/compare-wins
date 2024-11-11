@@ -688,7 +688,7 @@ list(
       }
       
       out <- selectInput("DATAANALYSIS__surv_covariate_strata_method",
-                         label = "Stratification method",
+                         label = "Censoring adjustment method",
                          choices =  choices
       )
       
