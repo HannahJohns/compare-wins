@@ -18,7 +18,7 @@ list(
   ),
   fluidRow(
     column(width=6,
-           "To use this, the Generalised Pairwise Comparisons approach requires
+           "To do this, the Generalised Pairwise Comparisons approach requires
            a formalised method for determining which combination
            of outcomes is considered to be preferable. COMPARE WINS supports
            several approaches that have been proposed in medical literature."
