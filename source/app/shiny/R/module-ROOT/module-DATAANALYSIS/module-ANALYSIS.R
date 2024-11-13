@@ -45,31 +45,18 @@ list(
   ),
   server_element = substitute({
     ### Server Elements #################################################
+   
+    ### Dynamic Analysis Options #################################################
+    #' Large parts of this module are dynamicly generated
+    #' based on what was supplied in terms of options, list-based approaches, etc
     
-    output$DATAANALYSIS__effect_measure_ui <- renderUI({
-      
-      if(input$DATAANALYSIS__method == "wins"){
-        choices <- c("Win Ratio"="winRatio",
-                     "Win Odds" = "winOdds",
-                     "Net Benefit" = "netBenefit"
-        )
-      } else {
-        choices <- c("Win Odds" = "winOdds")
-      }
-
-      radioButtons("DATAANALYSIS__effect_measure",
-                   label="Effect Size Measure:",
-                   choices=choices
-                  
-      )
-    })
-    
+    #### Main UI Element ------------------
+    #' The main UI control element
     output$DATAANALYSIS__ui_options <- renderUI({
       req(SYMBOLIC_LINK__data_sheet())
       data_sheet <- isolate(SYMBOLIC_LINK__data_sheet())
-
+      
       tagList(
-        # Need a better way of describing these
         radioButtons("DATAANALYSIS__method",
                      label="Select analysis method:",
                      choices=c("Win Ratio Analysis"="wins",
@@ -80,7 +67,7 @@ list(
         # All of this should be nested inside conditional panels
         fluidRow(selectInput(inputId = "DATAANALYSIS__arm",
                              label = "Intervention variable is:",
-                             choices = c(colnames(data_sheet)) #TODO: add option to specify no variable, add everything in covariates
+                             choices = c(colnames(data_sheet))
         )),
         fluidRow(
           uiOutput("DATAANALYSIS__arm_active") # TODO: probably swap this out with something in data import module for formatting stuff
@@ -165,12 +152,55 @@ list(
                           )
           )
         ),
-        fluidRow(uiOutput("DATAANALYSIS__warning_example")),
-        fluidRow(actionButton("DATAANALYSIS__analysis_go","Analyse!"))
-      )
+        fluidRow(uiOutput("DATAANALYSIS__error_warning_ui")),
+        fluidRow(uiOutput("DATAANALYSIS__go_button"))
+        
+      ) # End taglist
       
     })
     
+    
+    #### Go button -----------------------------
+    #' Only shows if there's no pre-caught errors
+    output$DATAANALYSIS__go_button <- renderUI({
+      
+      errors <- DATAANALYSIS__errors()
+      
+      if(length(errors)==0){
+        label <- "Analyse!"
+        disabled <- NULL
+      } else {
+        label <- "Check errors"
+        disabled <- TRUE
+      }
+      
+      actionButton("DATAANALYSIS__analysis_go",
+                   label,
+                   disabled=disabled)
+    })
+    
+    #### Effect size Measure ------------------
+    output$DATAANALYSIS__effect_measure_ui <- renderUI({
+      
+      #' Different methods support different effect size measures
+      
+      if(input$DATAANALYSIS__method == "wins"){
+        choices <- c("Win Ratio"="winRatio",
+                     "Win Odds" = "winOdds",
+                     "Net Benefit" = "netBenefit"
+        )
+      } else {
+        choices <- c("Win Odds" = "winOdds")
+      }
+      
+      radioButtons("DATAANALYSIS__effect_measure",
+                   label="Effect Size Measure:",
+                   choices=choices
+                   
+      )
+    })
+    
+    #### Selection active treatment arm ------------------
     output$DATAANALYSIS__arm_active <- renderUI({
       req(SYMBOLIC_LINK__data_sheet())
       
@@ -178,6 +208,10 @@ list(
       
       
       levels <- levels(as.factor(data_sheet[,input$DATAANALYSIS__arm]))
+      
+      # Generally speaking,if coded 0/1, 1/2, etc we 
+      # have the higher value is the intervention.
+      levels <- rev(levels)
       
       selectInput(inputId = "DATAANALYSIS__arm_active_selectInput",
                   label = "Intervention group is:",
@@ -187,28 +221,17 @@ list(
       
       
     })
+
     
     
-    output$DATAANALYSIS__warning_example <- renderUI({
-      bsCollapse(id = "power_effect_pairs_help",
-                 bsCollapsePanel("Warning",
-                                 "This will be a context-dependent warning for methods.",
-                                 "It should only show if methods appear like they could be",
-                                 "counterintuitive/biased/etc",
-                                 style="danger")
-      )
-    })
-    
-    ### Dynamic Analysis Options #################################################
-    
-    # Covariate Control ---------------------------------------------------------
-    
+   
+    #### Covariate Control ---------------------------------------------------------
     DATAANALYSIS__covariates <- reactiveVal(list())
-    
   
     # Observer for forcing a UI update
     DATAANALYSIS__force_covar_UI_update <- reactiveVal(0)
     
+    ##### Covariate UI update observer ---------------------------------------------------------
     # If an action was taken that causes structural change to 
     # Preference list (i.e. added/removed/re-ordered details)
     # Make these changes as neccesary 
@@ -295,7 +318,7 @@ list(
     })
     
    
-    
+    ##### Covariate list UI  ---------------------------------------------------------
     output$DATAANALYSIS__covariates_components <- renderUI({
       
       req(SYMBOLIC_LINK__data_sheet())
@@ -381,7 +404,7 @@ list(
     })
     
     
-    
+    ##### Covariate value change Observer   ---------------------------------------------------------
     # Observer for changing DATAANALYSIS__covariates in response to UI input
     # This doesn't require the same janky JS script hooks as there's not really
     # any need to track what the last button press was
@@ -442,6 +465,7 @@ list(
           }
     })
     
+    ##### Covariate options UI ---------------------------------------------------------
     output$DATAANALYSIS__covariate_options <- renderUI({
       
       out <- NULL
@@ -486,22 +510,18 @@ list(
       
     })
     
+    ### Survival Covariate Control ---------------------------------------------------------
     
-    # Survival Covariate Control ---------------------------------------------------------
-    
-    #TODO: This all needs reworked
     DATAANALYSIS__surv_covariates <- reactiveVal(list())
     
     # Observer for forcing a UI update
     DATAANALYSIS__force_surv_covar_UI_update <- reactiveVal(0)
     
-    
-    
-    
     # If an action was taken that causes structural change to 
     # Preference list (i.e. added/removed/re-ordered details)
     # Make these changes as neccesary 
     
+    ##### Survival covariates UI update observer ---------------------------------------------------------
     observe({
       
       req(SYMBOLIC_LINK__data_sheet())
@@ -584,8 +604,7 @@ list(
       }
     })
     
-    
-    
+    ##### Survival list UI ---------------------------------------------------------
     output$DATAANALYSIS__surv_covariates_components <- renderUI({
       
       req(SYMBOLIC_LINK__data_sheet())
@@ -668,6 +687,7 @@ list(
     })
     
     
+    ##### Survival options UI ---------------------------------------------------------
     output$DATAANALYSIS__surv_covariate_options <- renderUI({
       
       
@@ -696,6 +716,7 @@ list(
     })
     
     
+    ##### Survival value change observer ---------------------------------------------------------
     # Observer for changing DATAANALYSIS__surv_covariates in response to UI input
     # This doesn't require the same janky JS script hooks as there's not really
     # any need to track what the last button press was
@@ -755,8 +776,165 @@ list(
       })
     
  
+    ### Errors and  Warnings -----------------------------------------------------
     
-    # Analysis Outputs ---------------------------------------------------------
+    #' Things that we know will cause a crash are useful to have as a reactive
+    #' because they will let us hide the "Go" button if something looks fundamentally
+    #' wrong. 
+    #' Each error/warning is compiled as a list of <li> tags, and then combined
+    #' together in a renderUI()
+    DATAANALYSIS__errors <- reactive({
+      
+      DATAANALYSIS__method <- input$DATAANALYSIS__method
+      
+      data_sheet <- SYMBOLIC_LINK__data_sheet()
+      preference.method <- input$SYMBOLIC_LINK__preferenceType
+      preferences <- SYMBOLIC_LINK__preference_export()
+      arm <- input$DATAANALYSIS__arm
+      
+      out <- list()
+      
+      
+      #### Error: More than two groups --------------------------------------- 
+      #' COMPARE WINS is built for two-group problems.
+      #' If treatment group has more than two unique values, warn about error
+      #' 
+      
+      if(all(sapply(
+        list(data_sheet,
+             arm),
+        length)>0)
+      ) {
+        if(length(unique(data_sheet[,arm]))!=2){
+          out[[length(out)+1]] <- tags$li("Treatment group does not contain exactly 2 groups")
+        }
+      }
+      
+      
+      #### Error: PIM Incompatible --------------------------------------- 
+      #' If running PIM, but we have incompatible heirarchical method in use:
+      if(all(sapply(
+        list(DATAANALYSIS__method,
+             preference.method,
+             preferences),
+        length)>0)
+      ) {
+        
+        if( DATAANALYSIS__method=='pim' & preference.method=="heirarchical" & length(preferences$heirarchical)>1 ){
+          
+          
+          if(prod(sapply(preferences$heirarchical, function(x){x$type})=="numeric")!=1){
+            out[[length(out)+1]] <- tags$li("Survival outcomes not supported by PIM")
+          }
+          
+          if(prod(sapply(preferences$heirarchical, function(x){x$tau})==0)!=1){
+            out[[length(out)+1]] <- tags$li("Non-zero thresholds for clinical difference not supported by PIM")
+          }
+        }
+      }
+      
+  
+      
+      
+      # End error checks
+      out
+      
+    })
+    
+    DATAANALYSIS__warnings <- reactive({
+      
+      # Things that don't look like errors, but look problematic, are flagged here  
+      
+      out <- list()
+      
+      #### Warning: Win Odds and Censoring --------------------------------------- 
+      #' If win odds is being calculated, and we have survival endpoints,
+      #'  but no IPCW method is set, warn about this.
+      preference.method <- input$SYMBOLIC_LINK__preferenceType
+      preferences <- SYMBOLIC_LINK__preference_export()
+      
+      DATAANALYSIS__method <- input$DATAANALYSIS__method
+      DATAANALYSIS__effect_measure <- input$DATAANALYSIS__effect_measure
+      DATAANALYSIS__surv_covariate_strata_method <- input$DATAANALYSIS__surv_covariate_strata_method
+      
+      # When null we default to unadjusted
+      if(is.null(DATAANALYSIS__surv_covariate_strata_method)){
+        DATAANALYSIS__surv_covariate_strata_method <- "unadjusted"
+      }
+      
+      if(all(sapply(
+        list(DATAANALYSIS__method,
+             DATAANALYSIS__effect_measure,
+             DATAANALYSIS__surv_covariate_strata_method,
+             preference.method),
+        length)>0)
+      ) {
+        if( DATAANALYSIS__method=='wins'&
+            DATAANALYSIS__effect_measure=='winOdds' &
+            DATAANALYSIS__surv_covariate_strata_method=='unadjusted' &
+            preference.method == "heirarchical"
+        ){
+          if("surv" %in% sapply(preferences$heirarchical,function(x){x$type})){
+            out[[length(out)+1]] <- tags$li("The Win Odds may be biased in the presence 
+                                             of censored survival data.
+                                             Consider applying IPCW adjustment.
+                                            ")
+          }
+        } # end if check fails
+      } # End if check win odds censor is possible
+      
+      
+      out
+      
+    })
+    
+    output$DATAANALYSIS__error_warning_ui <- renderUI({
+      
+      preferences <- SYMBOLIC_LINK__preference_export()
+      
+      errors <- DATAANALYSIS__errors() # All errors are included in message
+      warnings <- DATAANALYSIS__warnings()
+    
+      
+      
+      if(length(errors)>0){
+        
+        if(length(warnings)>0){
+          warnings <- tagList("Additional warnings:",
+                              tags$ul(do.call("tagList",warnings))
+                              )
+        } else {
+          warnings <- ""
+        }
+        
+        out <-  bsCollapse(id = "analysis_warning",
+                           bsCollapsePanel("Error",
+                                           tags$ul(do.call("tagList",errors)),
+                                           warnings,
+                                           style="danger"),
+                           open = "Error"
+        )
+      } else {
+        
+        if(length(warnings)>0){
+          
+          out <-  bsCollapse(id = "analysis_warning",
+                             bsCollapsePanel("Warning",
+                                             tags$ul(do.call("tagList",warnings)),
+                                             style="warning"),
+                             open = "Warning"
+          )
+          
+        } else {
+          out <- ""          
+        }
+      }
+
+      out
+      
+    })
+    
+    # Analysis Outputs #####################
    
     # Relies on functions found in misc_functions.R
     
@@ -1381,8 +1559,7 @@ list(
     })
     
     
-    ### Output UI dynamic elements ---------------------------------------------
-    
+    #### Output UI dynamic elements ---------------------------------------------
     
     methods_changed <- reactiveVal(T)
     
@@ -1697,7 +1874,10 @@ list(
 
         out[[length(out)+1]] <- fluidRow(
           column(width=2,"Template Results for Reporting:"),
-          column(width=8,resultTemplate
+          column(width=8,
+                 HTML("<font color='#0000ff'>",
+                      resultTemplate,
+                      "</font>")
                  )
         )
 
@@ -1756,7 +1936,7 @@ list(
     })
 
     
-    #### Rank-based elements ---------------------
+    ##### Rank-based elements ---------------------
 
     DATAANALYSIS__xtab <- reactiveVal({})
     
@@ -1807,8 +1987,8 @@ list(
      
     })
     
-    #### Heirarchical elements ---------------------
-    ##### DATAANALYSIS__wins_output_decompsition_plot-----
+    ##### Heirarchical elements ---------------------
+    ###### DATAANALYSIS__wins_output_decompsition_plot-----
     output$DATAANALYSIS__wins_output_decompsition_plot <- renderPlot({
 
       df <- DATAANALYSIS__results()$decomposed_estimate
@@ -1882,7 +2062,7 @@ list(
 
     })
     
-    ##### DATAANALYSIS__wins_output_by_stratum_decompsition_plot-----
+    ###### DATAANALYSIS__wins_output_by_stratum_decompsition_plot-----
     output$DATAANALYSIS__wins_output_by_stratum_decompsition_plot <- renderPlot({
 
       results <- DATAANALYSIS__results()$estimates_by_stratum
@@ -1957,9 +2137,7 @@ list(
       do.call("wrap_plots",plotList)
 
     })
-    
-    
-    
+
     output$DATAANALYSIS__wins_output_by_stratum <- renderTable({
       results <- DATAANALYSIS__results()
       out <- NULL

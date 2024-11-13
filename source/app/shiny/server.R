@@ -19,6 +19,7 @@ source("R/misc_functions.R")
 module_list <- dir("R/module-ROOT/",recursive = T)
 module_list <- module_list[grepl("/module-",module_list)]
 
+  # last-minute substitution of variables here.
 write("Loading server module expressions:", stderr())
 module_server_expr <- sapply(module_list,\(f){
   
@@ -28,7 +29,6 @@ module_server_expr <- sapply(module_list,\(f){
   server_element <- rlang::expr_text(this_module$server_element)
 
   # If we've specified any symbolic links/imports between modules, perform
-  # last-minute substitution of variables here.
   if(length(this_module$imports)>0){
     for(i in 1:length(this_module$imports)){
       server_element <- gsub(
@@ -52,7 +52,6 @@ module_server_expr <- str2expression(module_server_expr)
 inputCollection <- function(input_names,input_index){
   c(t(outer(input_names,input_index,paste0)))
 }
-
 
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {

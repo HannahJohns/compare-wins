@@ -53,7 +53,7 @@ list(
                        participant that recieves the control",
                                   tags$em("assuming that tied pairs are equally likely to be wins as losses"),
                                   "Unlike the Win Ratio, the Win Odds will tend towards 1 (no effect) as
-                       the number of tied pairs increases.
+                       the number of tied pairs increases. 
                        "
                           ),
                           tags$li("The ",tags$b("Net Benefit"),
@@ -126,14 +126,35 @@ list(
                                     preference definition contains at least one survival endpoint,
                                     consider applying IPCW weighting. More information on this topic
                                     can be found",
-                                    tags$a("HERE.",href=" https://doi.org/10.1002/pst.2251"),
+                                    tags$a("HERE.",href=" https://doi.org/10.1002/pst.2251",target="_blank"),
                                     
                                     "Adjustment for censoring is not supported if any endpoint considers
                                     lower values to be better.
-                                    "
+                                    ",
                                     
                                     # tags$h3("Results"),
                                     # tags$h4("Visualisations")
+                                    
+                                    tags$h3("References and Further Reading"),
+                                    
+                                    tags$ul(
+                                      tags$li(tags$a("Dong, G., Hoaglin, D. C., Huang, B., Cui, Y., Wang, D.,
+                                           Cheng, Y., & Gamalo‐Siebers, M. (2023). The stratified
+                                           win statistics (win ratio, win odds, and net benefit).
+                                           Pharmaceutical Statistics, 22(4), 748-756.",
+                                             href="https://doi.org/10.1002/pst.2293",target="_blank")),
+                                      
+                                      tags$li(tags$a("Dong, G., Huang, B., Verbeeck, J., Cui, Y., Song, J.,
+                                           Gamalo‐Siebers, M., ... & Kolassa, J. (2023). Win statistics
+                                           (win ratio, win odds, and net benefit) can complement one
+                                           another to show the strength of the treatment effect on
+                                           time‐to‐event outcomes. Pharmaceutical Statistics, 22(1)
+                                           20-33.",href=" https://doi.org/10.1002/pst.2251",target="_blank"))
+                                    ),
+                                
+                                    
+                                    ""
+                                    
                                     
                       )
              ),
@@ -157,14 +178,49 @@ list(
                         tags$li("No included endpoint is survival, AND"),
                         tags$li("All included endpoints have a minimal clinical difference of 0"),
                       ),
+                      
                       tags$h3("Managing Covariates"),
                       "This method provides covariate adjustment through both stratification and 
-                      continuous covariate adjustment. 
-                      "
+                      continuous covariate adjustment. Behind the scenes, it fits a linear regression
+                      model that estimates the chance that person $a$ has a better outcome than person $b$,
+                      based on the",tags$em("difference")," in their treatment and any covariates. Mathematically,
+                      this looks like:
+                      
+                      $$ \\textrm{logit}\\left(Prob(Y_a>Y_b)+\\frac{1}{2}Prob(Y_a=Y_b)\\right) =
+                      \\beta_{\\textrm{trt}} (X_{{\\textrm{trt}},a}-X_{{\\textrm{trt}},b}) +
+                      \\beta_1 (X_{1,a}-X_{1,b}) +
+                      \\beta_2 (X_{2,a}-X_{2,b}) +
+                      \\ldots  $$
+                      
+                      where $X_{{\\textrm{trt}},a}$ is the treatment group for person $a$,
+                      $X_{1,a}$ is the first covariate for participant $a$, and so on. 
+                      
+                      The Win Odds is estimated by:
+                      
+                      $$\\textrm{Win Odds} = \\left(\\beta_{\\textrm{trt}}\\right)$$
+                      ",
                       
                       # tags$h3("Results"),
                       # tags$h4("Visualisations")
                     
+                      tags$h3("References and Further Reading"),
+                      
+                      tags$ul(
+                        tags$li(tags$a("De Schryver, M., & De Neve, J. (2019). A tutorial on probabilistic
+                             index models: Regression models for the effect size P (Y1< Y2).
+                             Psychological Methods, 24(4), 403.",
+                               href="https://doi.org/10.1037/met0000194",target="_blank")),
+                        
+                        tags$li(tags$a("Thas, O., Neve, J. D., Clement, L., & Ottoy, J. P. (2012). Probabilistic index
+                             models. Journal of the Royal Statistical Society Series B: Statistical Methodology,
+                             74(4), 623-671.", 
+                               href="https://doi.org/10.1111/j.1467-9868.2011.01020.x",target="_blank"))
+                      ),
+                      
+                      
+                      ""
+                      
+                      
                                     
                       )
              )

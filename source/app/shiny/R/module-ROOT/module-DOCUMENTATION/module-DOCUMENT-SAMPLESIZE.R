@@ -9,7 +9,7 @@ list(
       column(width=6,
        "COMPARE WINS estimates sample size based on the power formula provided by",
        tags$a("Yu and Ganju (2022)",
-              href="https://doi.org/10.1002/sim.9297"),
+              href="https://doi.org/10.1002/sim.9297",target="_blank"),
        ". This sample size estimation is provided in two approaches, detailed below"
       )
     ),

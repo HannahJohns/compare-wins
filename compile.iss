@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "Compare WINS"
-#define MyAppVersion "0.4.0"
+#define MyAppVersion "0.5.0"
 #define MyAppPublisher "Australian Stroke Alliance"
 #define MyAppURL "https://github.com/HannahJohns/compare-wins"
 #define MyAppExeName "run.bat"

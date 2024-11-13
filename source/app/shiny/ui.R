@@ -11,6 +11,12 @@ source("R/constructor_functions.R")
 # Define UI for application that draws a histogram
 ui <- fluidPage(
   withMathJax(),
+  tags$div(HTML("<script type='text/x-mathjax-config' >
+    MathJax.Hub.Config({
+    tex2jax: {inlineMath: [['$','$']]}
+    });
+    </script >
+    ")),
   tags$head(tags$style(
     HTML(".shiny-notification {
               height: 100px;
@@ -30,6 +36,6 @@ ui <- fluidPage(
   do.call("tabsetPanel",construct_tabset_ui("R/module-ROOT")),
   
   fluidRow(hr()),
-  fluidRow("Version 0.4.0")
+  fluidRow("Version 0.5.0")
   
 )

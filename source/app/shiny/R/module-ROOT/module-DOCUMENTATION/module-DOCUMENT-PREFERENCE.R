@@ -168,19 +168,19 @@ list(
                                tags$li(tags$a("Buyse, M. (2010). Generalized pairwise comparisons of prioritized
                                               outcomes in the two‐sample problem. Statistics in medicine,
                                               29(30), 3245-3257.",
-                                              href="https://doi.org/10.1002/sim.3923")),
+                                              href="https://doi.org/10.1002/sim.3923",target="_blank")),
                                tags$li(tags$a(
                                  "Evans, S. R., & Follmann, D. (2016). Using outcomes to analyze patients rather
                                  than patients to analyze outcomes: a step toward pragmatism in benefit:
                                  risk evaluation. Statistics in biopharmaceutical research, 8(4), 386-393.",
                                ),
-                               href="https://doi.org/10.1080/19466315.2016.1207561"),
+                               href="https://doi.org/10.1080/19466315.2016.1207561",target="_blank"),
                                tags$li(
                                  tags$a(
                                    "Pocock, S. J., Ariti, C. A., Collier, T. J., & Wang, D. (2012).
                                    The win ratio: a new approach to the analysis of composite endpoints
                                    in clinical trials based on clinical priorities. European heart journal, 33(2), 176-182.",
-                                   href="https://doi.org/10.1093/eurheartj/ehr352"
+                                   href="https://doi.org/10.1093/eurheartj/ehr352",target="_blank"
                                  )
                                )
                              )
@@ -216,7 +216,7 @@ list(
                                        The adaptation of the desirability of outcome ranking for
                                        interventional clinical trials in epilepsy: A novel consumer‐led
                                        outcome measure. Epilepsia Open, 8(4), 1608-1615.",
-                                       href="https://doi.org/10.1002/epi4.12839"
+                                       href="https://doi.org/10.1002/epi4.12839",target="_blank"
                                        )
                                       )
                              )
