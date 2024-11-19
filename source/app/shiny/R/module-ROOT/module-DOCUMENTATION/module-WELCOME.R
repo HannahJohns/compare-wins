@@ -82,7 +82,7 @@ list(
            )
            ),
     column(width=6,
-           tags$img(width=800,src="win_diagram.svg")
+           tags$img(width=600,src="win_diagram.svg")
           )
   ),
   hr(),

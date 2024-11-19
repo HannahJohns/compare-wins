@@ -37,6 +37,6 @@ ui <- fluidPage(
   do.call("tabsetPanel",construct_tabset_ui("R/module-ROOT")),
   
   fluidRow(hr()),
-  fluidRow("Version 0.5.1")
-  
+  fluidRow(column(width=1,textOutput("software_version_display"))),
+  fluidRow(hr())
 )
