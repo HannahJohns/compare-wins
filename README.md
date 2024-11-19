@@ -16,7 +16,7 @@ Generalised Pairwise Comparisons estimate the chance that a randomly selected pa
 
 <img src="source/app/shiny/www/win_diagram.svg" height=450>
 
-Because the idea of 'better outcome' is extremely general, Generalised Pairwise Comparisons can consider trade-offs between multiple clinical outcomes. This allows the approach to better reflect the multifaceted nature of health outcomes. Other names for Gen
+Because the idea of 'better outcome' is extremely general, Generalised Pairwise Comparisons can consider trade-offs between multiple clinical outcomes. This allows the approach to better reflect the multifaceted nature of health outcomes.
 
 ## Features
 
