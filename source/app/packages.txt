@@ -20,3 +20,4 @@ WINS
 pim
 simsalapar
 rankinPlot
+httr
