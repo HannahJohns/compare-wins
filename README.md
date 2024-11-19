@@ -1,4 +1,4 @@
-# COMPARE WINS <a> <img src=https://github.com/HannahJohns/compare-wins/blob/0.5-polishing/source/app/shiny/www/compare-wins-logo.svg?raw=true align="right" height="100" style="background-color:white;padding:20px;"> </a>
+# COMPARE WINS <a><img src="source/app/shiny/www/compare-wins-logo.svg" align="right" height="100"></a>
 
 **C**omparison **O**f **M**ultifaceted **P**references **A**s **R**esearch **E**ndpoints **U**sing **WIN** **S**tatistics
 
@@ -14,7 +14,7 @@ A clinician-friendly point-and-click interface for analysing medical research da
 
 Generalised Pairwise Comparisons estimate the chance that a randomly selected participant from the treatment group will have a better outcome than a randomly selected participant from the control group. Other names for the approach include the Win Ratio and Desirability Of Outcome Ranking (DOOR)
 
-<img src =https://github.com/HannahJohns/compare-wins/blob/0.5-polishing/source/app/shiny/www/win_diagram.svg?raw=true height=450 style="background-color:white;padding:20px;" >
+<img src="source/app/shiny/www/win_diagram.svg" height=450>
 
 Because the idea of 'better outcome' is extremely general, Generalised Pairwise Comparisons can consider trade-offs between multiple clinical outcomes. This allows the approach to better reflect the multifaceted nature of health outcomes. Other names for Gen
 
