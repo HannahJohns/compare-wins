@@ -10,6 +10,7 @@ source("R/constructor_functions.R")
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
+  
   withMathJax(),
   tags$div(HTML("<script type='text/x-mathjax-config' >
     MathJax.Hub.Config({
@@ -30,12 +31,12 @@ ui <- fluidPage(
   )),
 
   # Application title
-  titlePanel("COMPARE WINS"),
+  titlePanel(tags$img(width=300,src="compare-wins-logo.svg"),windowTitle = "COMPARE WINS"),
   
   # UI is constructed recursively based on some root module
   do.call("tabsetPanel",construct_tabset_ui("R/module-ROOT")),
   
   fluidRow(hr()),
-  fluidRow("Version 0.5.0")
-  
+  fluidRow(column(width=1,textOutput("software_version_display"))),
+  fluidRow(hr())
 )

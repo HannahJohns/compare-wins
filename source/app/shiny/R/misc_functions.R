@@ -31,15 +31,71 @@
 # method <- "pim"
 
 
+check_update <- function(software_version){
+  
+  update_flagged <- FALSE
+  
+  # Make API call to github to check for updates on launch
+  api_results <- tryCatch({
+    httr::content(httr::GET("https://api.github.com/repos/HannahJohns/compare-wins/releases/latest"))
+  }, error=function(e){list(status="ERROR")})
+  
+  
+  
+  if(is.null(api_results$status)){
+    
+    release_version_number <- api_results$tag_name
+    
+    release_version_number
+    release_version_number <- strsplit(gsub("v","",api_results$tag_name),"\\.")[[1]]
+    release_version_number <- as.numeric(release_version_number)
+    
+    
+    # If we have a build number, note this
+    while(length(release_version_number) < length(software_version)) release_version_number <- c(release_version_number,0)
+    
+    for(i in 1:length(software_version)){
+      if(release_version_number[i] < software_version[i]){
+        break    
+      } else if(release_version_number[i] > software_version[i]){
+        update_flagged <- TRUE
+        break
+      }
+    }
+    
+    # We're behind in version number. Check that we have a download link, etc
+    if(update_flagged){
+      
+      release_notes <- api_results$body
+      
+      download_url <- sapply(api_results$assets,function(x){
+        
+        if(x$content_type != "application/x-msdownload") return(NULL)
+        
+        x$browser_download_url
+      })
+      
+      if(length(download_url) != 1) update_flagged <- FALSE
+    } 
+    
+  }
+  
+  if(update_flagged){
+    update_check <- list(needed = T,new_tag=api_results$tag_name,message=release_notes,url=download_url)
+  } else {
+    update_check <- list(needed = F,new_tag=NULL,message=NULL,url=NULL)
+  }
+  
+  update_check
+  
+}
+
+
+# Infrastructure functions ##################################
 
 
 
-
-
-
-
-
-################################################################################
+# Analysis Functions ##################################
 
 # Wrapper function for interfacing with underlying stats software.
 # Output should be a data frame with the following criteria:

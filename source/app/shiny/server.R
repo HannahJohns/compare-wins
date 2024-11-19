@@ -1,4 +1,3 @@
-
 library(MASS)
 
 library(shiny)
@@ -13,8 +12,19 @@ library(rankinPlot)
 
 library(rlang)
 library(tidyverse)
+library(httr)
 
 source("R/misc_functions.R")
+
+
+
+software_version <- c(major=0,
+                      minor=5,
+                      patch=1,
+                      build=NULL)
+
+update_flagged <- check_update(software_version)
+
 
 module_list <- dir("R/module-ROOT/",recursive = T)
 module_list <- module_list[grepl("/module-",module_list)]
@@ -53,6 +63,11 @@ inputCollection <- function(input_names,input_index){
   c(t(outer(input_names,input_index,paste0)))
 }
 
+
+
+
+
+
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
   
@@ -61,5 +76,34 @@ server <- function(input, output, session) {
     stopApp()
   })
   
+  observe({
+    update_flagged
+    
+    print(update_flagged)
+    if(update_flagged$needed){
+      showModal(modalDialog(
+        title=sprintf("Update available: %s",update_flagged$new_tag),
+        markdown(update_flagged$message),
+        tags$a(
+          href=update_flagged$url,
+          HTML(
+            "<button style='color:white; background-color: DodgerBlue;'><i class='fa fa-download'></i> Download</button>"
+          ),
+          target="_blank"
+        )
+        
+        
+        
+      ))
+    }
+  })
+  
+  
+  # Insert module server code
   eval(module_server_expr)
+  
+  output$software_version_display <- renderText(
+    sprintf("v%s",paste(software_version,collapse="."))
+  )
+  
 }
