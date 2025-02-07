@@ -5,11 +5,8 @@ source("R/misc_functions.R")
 
 software_version <- c(major=0,
                       minor=5,
-                      patch=1,
+                      patch=2,
                       build=NULL)
-
-update_flagged <- check_update(software_version)
-
 
 module_list <- dir("R/module-ROOT/",recursive = T)
 module_list <- module_list[grepl("/module-",module_list)]
@@ -61,6 +58,13 @@ server <- function(input, output, session) {
     stopApp()
   })
   
+  # Insert module server code
+  eval(module_server_expr)
+  
+  # Check for updates. This happens after modules (including settings) are loaded
+  # so we know if we should bypass this.
+  update_flagged <- check_update(software_version)
+  
   observe({
     update_flagged
     
@@ -77,15 +81,11 @@ server <- function(input, output, session) {
           target="_blank"
         )
         
-        
-        
       ))
     }
   })
   
   
-  # Insert module server code
-  eval(module_server_expr)
   
   output$software_version_display <- renderText(
     sprintf("v%s",paste(software_version,collapse="."))
