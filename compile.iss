@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "COMPARE WINS"
-#define MyAppVersion "0.5.1"
+#define MyAppVersion "0.5.2"
 #define MyAppPublisher "Australian Stroke Alliance"
 #define MyAppURL "https://github.com/HannahJohns/compare-wins"
 #define MyAppExeName "run.bat"
@@ -24,8 +24,8 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir=D:\repositories\clinician-gpc\releases
 OutputBaseFilename=CompareWins_setup
-Compression=lzma
-SolidCompression=yes
+Compression=zip
+SolidCompression=no
 WizardStyle=modern
 
 [Languages]

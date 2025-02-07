@@ -1,22 +1,7 @@
-library(MASS)
 
-library(shiny)
-library(DT)
-
-library(simsalapar)
-library(pim)
-library(WINS)
-
-library(patchwork)
-library(rankinPlot)
-
-library(rlang)
-library(tidyverse)
-library(httr)
+source("R/load_packages.R")
 
 source("R/misc_functions.R")
-
-
 
 software_version <- c(major=0,
                       minor=5,
