@@ -9,9 +9,12 @@ software_version <- c(major=0,
                       build=NULL)
 
 module_list <- dir("R/module-ROOT/",recursive = T)
-module_list <- module_list[grepl("/module-",module_list)]
+# Get things that have filenames that look like modules.
+# There is probably a more sensible way of doing this,
+# but this works.
+module_list <- module_list[grepl("module-[[:alnum:][:space:]_-]+.R",module_list,)]
 
-  # last-minute substitution of variables here.
+# last-minute substitution of variables here.
 write("Loading server module expressions:", stderr())
 module_server_expr <- sapply(module_list,\(f){
   
