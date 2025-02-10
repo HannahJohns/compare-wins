@@ -22,7 +22,8 @@ list(
   imports=c("DATAIMPORT__data_sheet"="SYMBOLIC_LINK__data_sheet",
             "PREFDEF__preference_export"="SYMBOLIC_LINK__preference_export",
             "PREFDEF__preferenceType"="SYMBOLIC_LINK__preferenceType",
-            "PREFDEF__preference_rank"="SYMBOLIC_LINK__preference_rank"
+            "PREFDEF__preference_rank"="SYMBOLIC_LINK__preference_rank",
+            "SETTINGS__settings" = "SYMBOLIC_LINK__settings"
             ),
   ui_element = sidebarLayout(
     sidebarPanel(
@@ -944,6 +945,11 @@ list(
     DATAANALYSIS__results <- reactiveVal(NULL)
     
     observeEvent(input$DATAANALYSIS__analysis_go,{
+      
+      ##### TODO: BUILD LOG OF RESULTS.
+      # settings <- SYMBOLIC_LINK__settings()
+      
+      
       req(SYMBOLIC_LINK__data_sheet())
       req(SYMBOLIC_LINK__preference_export())
       

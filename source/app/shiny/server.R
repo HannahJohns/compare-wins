@@ -6,7 +6,7 @@ source("R/misc_functions.R")
 software_version <- c(major=0,
                       minor=5,
                       patch=2,
-                      build=NULL)
+                      build=9001)
 
 module_list <- dir("R/module-ROOT/",recursive = T)
 # Get things that have filenames that look like modules.
@@ -66,7 +66,10 @@ server <- function(input, output, session) {
   
   # Check for updates. This happens after modules (including settings) are loaded
   # so we know if we should bypass this.
-  update_flagged <- check_update(software_version)
+  
+  # See module-SETTINGS.R for definition of SETTINGS__settings()
+  update_flagged <- check_update(software_version,isolate(SETTINGS__settings()))
+  heartbeat(software_version,isolate(SETTINGS__settings()))
   
   observe({
     update_flagged

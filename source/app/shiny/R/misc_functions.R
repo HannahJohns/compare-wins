@@ -31,15 +31,24 @@
 # method <- "pim"
 
 
-check_update <- function(software_version){
+check_update <- function(software_version, settings){
   
+  if(!settings$update_check){
+    print("Update check skipped")
+    return(list(needed = F,new_tag=NULL,message=NULL,url=NULL))
+  } 
+  
+  
+  print("Checking for updates")
+  startTime <- Sys.time()
+  
+    
   update_flagged <- FALSE
   
   # Make API call to github to check for updates on launch
   api_results <- tryCatch({
     httr::content(httr::GET("https://api.github.com/repos/HannahJohns/compare-wins/releases/latest"))
   }, error=function(e){list(status="ERROR")})
-  
   
   
   if(is.null(api_results$status)){
@@ -86,9 +95,61 @@ check_update <- function(software_version){
     update_check <- list(needed = F,new_tag=NULL,message=NULL,url=NULL)
   }
   
+  
+  endTime <- Sys.time()
+  print(sprintf("Done, took %s", difftime(endTime,startTime)))
+  
   update_check
   
 }
+
+
+heartbeat <- function(software_version,settings){
+  
+  if(settings$heartbeat){
+    
+    print("Sending usage ping")
+    startTime <- Sys.time()
+    
+    prev_time <- tryCatch({
+      tmp <- readRDS("heartbeat_time.RDS")
+      if(!is.POSIXct(tmp)) stop("heartbeat is not POSIXct")
+      tmp
+    }, error=function(e){NA})
+    
+    
+    time <- Sys.time()
+    tryCatch({
+      saveRDS(time,"heartbeat_time.RDS")
+    })
+    
+    if(!is.na(prev_time) & !is.na(time)){
+      timeDiff <- as.numeric(difftime(time,prev_time, units = "hours"))      
+    }
+    
+    # This is not good. It really should use a proper REST API but building one
+    # is currently beyond my skillset.
+    
+    usage_data <- jsonlite::toJSON(
+      list(version=paste(software_version,collapse="."), timeDiff=timeDiff)
+    )
+    url <- sprintf("https://htjohns.com/pings/ping.php?app=comparewins&message=%s",usage_data)
+    
+    tryCatch({
+      con <- curl::curl(url)
+      readLines(con, warn = FALSE)  
+      close(con)
+    })
+    
+    endTime <- Sys.time()
+    print(sprintf("Done, took %s", difftime(endTime,startTime)))
+
+  } else {
+    print("Ping disabled, skipped")
+  }
+  
+}
+
 
 
 # Infrastructure functions ##################################

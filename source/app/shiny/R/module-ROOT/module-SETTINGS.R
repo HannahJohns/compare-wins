@@ -74,6 +74,9 @@ list(
    
     observe({
       current_settings <- SETTINGS__settings()
+      print("Current Settings are:")
+      print(current_settings)
+      
       saveRDS(current_settings,SETTINGS__settings_file)
     })
     

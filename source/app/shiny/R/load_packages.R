@@ -2,6 +2,8 @@
 # Master list of packages to load/install
 package_list <- c(
   "MASS",
+  "jsonlite",
+  "curl",
   
   "shiny",
   "shinyBS",

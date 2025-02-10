@@ -2,7 +2,7 @@ PRIVACY
 
 Upon startup, this program accesses the internet to:
 1. Check for updates, and 
-2. Send an anonymous ping indicating that the program has been opened. This information is used to estimate the number of active users of the program.
+2. Send an anonymous ping indicating that the program has been opened, how long since it was last opened on this device. This information is used to estimate the number of active users of the program.
 
 By installing this software, you agree to this use. Either of these functions may be disabled at any time within the program.
 
