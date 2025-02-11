@@ -949,6 +949,28 @@ list(
       ##### TODO: BUILD LOG OF RESULTS.
       # settings <- SYMBOLIC_LINK__settings()
       
+      # If no log file is to be created, set logFile to "NUL" and windows will
+      # dump the output
+      
+      # if(we should log){
+      #
+      #} else {
+      #  logFile <- "NUL" #Discard logs as they're made. 
+      #}
+      #   
+      
+      
+      
+      logFile <- "" # Write to console for the time being
+      
+      cat(sprintf("%s\nBegin COMPARE WINS log file at %s\n\tAnalysis run by %s on machine %s\n%s",
+          paste(rep("=",80),collapse = ""),
+          as.character(Sys.time()),
+          Sys.info()["user"],
+          Sys.info()["nodename"],
+          paste(rep("=",80),collapse = "")
+          ),
+          file = logFile, append = FALSE)
       
       req(SYMBOLIC_LINK__data_sheet())
       req(SYMBOLIC_LINK__preference_export())
