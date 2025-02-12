@@ -18,7 +18,9 @@ package_list <- c(
   
   "rlang",
   "tidyverse",
-  "httr"
+  "httr",
+  "table1",
+  "pander"
 )
 
 

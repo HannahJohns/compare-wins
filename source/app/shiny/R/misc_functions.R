@@ -165,9 +165,10 @@ heartbeat <- function(software_version,settings){
 # break once we start adding e.g. plots, so it needs standardised.
 
 run_analysis <- function(args, method, effect.measure){
-  
-  print(sprintf("Running %s with args",method))
-  print(args)
+
+    
+  # print(sprintf("Running %s with args",method))
+  # print(args[setdiff])
   
   
   # Some sort of default value
@@ -856,10 +857,10 @@ pp_plot <- function(x0,x1,
   rbind(
     tieGrid %>%
       mutate(weight=xmax-xmin, group=1) %>%
-      select(rank=rank0,group,weight=weight),
+      dplyr::select(rank=rank0,group,weight=weight),
     tieGrid %>%
       mutate(weight=ymax-ymin, group=0) %>%
-      select(rank=rank0,group,weight=weight)
+      dplyr::select(rank=rank0,group,weight=weight)
   ) %>% 
     mutate(weight=weight*ifelse(group==1,sum(x1),sum(x0)),
                rank=factor(rank)) -> propodds_df
@@ -976,7 +977,7 @@ analysis_results_to_wr_df <- function(df,df_overall){
   
   # Force data frame into correct structure
   df %>%
-    select(
+    dplyr::select(
       level,
       level_names=level_var,
       win_inherit,
@@ -1001,7 +1002,7 @@ analysis_results_to_wr_df <- function(df,df_overall){
            level=max(df$level)+1,
            level_var="Overall"
     ) %>%
-    select(
+    dplyr::select(
       level,
       level_names=level_var,
       win_inherit,

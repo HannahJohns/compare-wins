@@ -74,7 +74,6 @@ server <- function(input, output, session) {
   observe({
     update_flagged
     
-    print(update_flagged)
     if(update_flagged$needed){
       showModal(modalDialog(
         title=sprintf("Update available: %s",update_flagged$new_tag),

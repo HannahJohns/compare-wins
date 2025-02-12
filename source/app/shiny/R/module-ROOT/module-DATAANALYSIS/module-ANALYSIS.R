@@ -946,32 +946,7 @@ list(
     
     observeEvent(input$DATAANALYSIS__analysis_go,{
       
-      ##### TODO: BUILD LOG OF RESULTS.
-      # settings <- SYMBOLIC_LINK__settings()
-      
-      # If no log file is to be created, set logFile to "NUL" and windows will
-      # dump the output
-      
-      # if(we should log){
-      #
-      #} else {
-      #  logFile <- "NUL" #Discard logs as they're made. 
-      #}
-      #   
-      
-      
-      
-      logFile <- "" # Write to console for the time being
-      
-      cat(sprintf("%s\nBegin COMPARE WINS log file at %s\n\tAnalysis run by %s on machine %s\n%s",
-          paste(rep("=",80),collapse = ""),
-          as.character(Sys.time()),
-          Sys.info()["user"],
-          Sys.info()["nodename"],
-          paste(rep("=",80),collapse = "")
-          ),
-          file = logFile, append = FALSE)
-      
+     
       req(SYMBOLIC_LINK__data_sheet())
       req(SYMBOLIC_LINK__preference_export())
       
@@ -1065,16 +1040,187 @@ list(
 
         
         
+        ##### TODO: BUILD LOG OF RESULTS.
+        # settings <- SYMBOLIC_LINK__settings()
+        
+        # If no log file is to be created, set logFile to "NUL" and windows will
+        # dump the output
+        
+        # if(we should log){
+        #
+        #} else {
+        #  logFile <- "NUL" #Discard logs as they're made. 
+        #}
+        
+        logFile <- "" # Write to console for the time being
+        
+        cat(sprintf("%s\nBegin COMPARE WINS log file at %s\n\tAnalysis run by %s on machine %s\n%s\n",
+                    paste(rep("=",80),collapse = ""),
+                    as.character(Sys.time()),
+                    Sys.info()["user"],
+                    Sys.info()["nodename"],
+                    paste(rep("=",80),collapse = "")
+        ),
+        file = logFile, append = FALSE)
+        
+        # Example of what summary of data frame will look like.
+        # Just need to get all results 
+        
+        cat(
+          sprintf("Preferences are defined using the %s method and are as follows:\n",
+                  preference.method)
+        )
+        
+        if(preference.method == "heirarchical"){
+          
+          cat(paste(capture.output({
+            pander::pandoc.table(
+              do.call("rbind",
+                      lapply(preferences[[preference.method]], function(x){do.call("data.frame",x)})
+              )
+            )
+          }),
+          collapse="\n"),
+          file=logFile
+          )
+          
+          
+        } else if (preference.method == "list"){
+          
+          print(preferences[[preference.method]])
+        }
+
+        cat(sprintf("Analysis compares preferences across %s, where %s is the intervention group\n",
+                    arm,
+                    levels[length(levels)]
+                    ),
+            file=logFile
+        )
+        
+        if(length(stratum)>0){
+          cat("Analysis is stratified by %s\n",
+              paste(stratum, collapse="; "),
+              file=logFile
+              )
+          cat("Stratum are combined using %s weights\n",
+              stratum.weight,
+              file=logFile)
+        }
+
+        if(length(covariates_effect)>0){
+          cat("Effects are adjusted for %s\n",
+              paste(covariates_effect, collapse="; "),
+              file=logFile
+          )
+        }
+        
+        
+        cat("Any censoring in outcomes is adjusted for using %s\n",
+            adjust.method,
+            file=logFile
+        )
+
+        if(length(covariates_censor)>0){
+          cat(sprintf("The following variables are used to adjust for censoring: %s",
+                paste(covariates_censor, collapse="; ")),
+                file=logFile
+                )
+        }
+        
+        cat(sprintf("Allowable Type-I error (alpha) set at %0.4f\n",
+            alpha),
+            file=logFile
+        )
+        
+        cat(sprintf("Estimation method is %s\n",
+            estimator_method),
+            file=logFile
+        )
+        
+        cat(sprintf("Maximum iterations is %d\n",
+            max_iter),
+            file=logFile
+        )
+        
+        
+        cat("Summary of input data:\n")
+        
+        # TODO: THIS IS CURRENTLY BROKEN
+        browser()
+        
+        table1_formula <- "arm"
+        
+        if(preference.method == "heirarchical"){
+          
+          table1_formula <- paste0(
+            table1_formula,"+",
+            paste(
+              sapply(preferences[[preference.method]], function(x){x$var}),
+              collapse="+"
+            )
+          )
+          
+        } else if(preference.method == "list"){
+          # TODO: This needs written
+        }
+        
+        if(length(stratum)>0){
+          table1_formula <- paste0(
+            table1_formula,"+",
+            paste(
+              stratum,
+              collapse="+"
+            )
+          )
+        }
+        
+        if(length(covariates_effect)>0){
+          table1_formula <- paste0(
+            table1_formula,"+",
+            paste(
+              covariates_effect,
+              collapse="+"
+            )
+          )
+        }
+        
+        if(length(covariates_censor)>0){
+          table1_formula <- paste0(
+            table1_formula,"+",
+            paste(
+              covariates_censor,
+              collapse="+"
+            )
+          )
+        }
+        
+        table1_formula <- paste0(table1_formula,"|arm")
+        
+        cat(paste(capture.output({
+          pander::pandoc.table(
+            as.data.frame(table1(as.formula(table1_formula),
+                                 data=(function(x){
+                                   for( i in c(arm,stratum))
+                                     x[,i] <- as.factor(x[,i])
+                                   x
+                                   })(data_sheet)
+            )
+            ),
+            style="grid",
+            split.tables=Inf
+          )
+        }),collapse="\n"),
+        file=logFile
+        )
+        
         # All methods should should show a progress bar
         
         # Delay showing errors/warnings until after all results are run.
         errorList <- list()
         warningList <- list()
-        
 
         withProgress(message = 'Analysing',detail = "Overall results", value = 0, {
         
-          
         ### Analysis loop (heirarchy-based) --------------    
         if(preference.method=="heirarchical"){
           
