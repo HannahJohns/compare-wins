@@ -1048,23 +1048,22 @@ list(
         
         max_iter <- isolate(input$DATAANALYSIS__pim_estimator_max_iter)
 
-        
-        
-        ##### TODO: BUILD LOG OF RESULTS.
         settings <- SYMBOLIC_LINK__settings()
-        print(settings)
-        browser()
         
         # If no log file is to be created, set logFile to "NUL" and windows will
         # dump the output
-        
-        # if(we should log){
-        #
-        #} else {
-        #  logFile <- "NUL" #Discard logs as they're made. 
-        #}
-        
+
         logFile <- "" # Write to console for the time being
+        if(settings$log_enabled){
+          logFile <- sprintf(
+            "%s/log-%s-%s.txt",
+            settings$log_dir,
+            Sys.info()["login"],
+            gsub("[[:space:][:space:][:punct:]]+","",Sys.time())
+          )
+        } else {
+         logFile <- "NUL" #Discard logs as they're made.
+        }
         
         cat(sprintf("%s\nBegin COMPARE WINS log file at %s\n\tAnalysis run by %s on machine %s\n%s\n",
                     paste(rep("=",80),collapse = ""),
@@ -1080,7 +1079,9 @@ list(
         
         cat(
           sprintf("Preferences are defined using the %s method and are as follows:\n",
-                  preference.method)
+                  preference.method),
+          file=logFile,
+          append = TRUE
         )
         
         if(preference.method == "heirarchical"){
@@ -1089,11 +1090,14 @@ list(
             pander::pandoc.table(
               do.call("rbind",
                       lapply(preferences[[preference.method]], function(x){do.call("data.frame",x)})
-              )
+              ),
+              style="grid",
+              split.tables=Inf
             )
           }),
           collapse="\n"),
-          file=logFile
+          file=logFile,
+          append = TRUE
           )
           
           
@@ -1101,69 +1105,85 @@ list(
           
           cat(paste(capture.output({
             pander::pandoc.table(
-              preferences[[preference.method]]
+              preferences[[preference.method]],
+              style="grid",
+              split.tables=Inf
             )
           }),
           collapse="\n"),
-          file=logFile
+          file=logFile,
+          append = TRUE
           )
           
         }
 
-        cat(sprintf("Analysis compares preferences across %s, where %s is the intervention group\n",
+        cat(sprintf("\n\nAnalysis compares preferences across %s, where %s is the intervention group\n",
                     arm,
                     levels[length(levels)]
                     ),
-            file=logFile
+            file=logFile,
+            append = TRUE
         )
         
         if(length(stratum)>0){
           cat("Analysis is stratified by %s\n",
               paste(stratum, collapse="; "),
-              file=logFile
+              file=logFile,
+              append = TRUE
               )
           cat("Stratum are combined using %s weights\n",
               stratum.weight,
-              file=logFile)
+              file=logFile,
+              append = TRUE
+              )
         }
 
         if(length(covariates_effect)>0){
           cat("Effects are adjusted for %s\n",
               paste(covariates_effect, collapse="; "),
-              file=logFile
+              file=logFile,
+              append = TRUE
           )
         }
         
         
-        cat("Any censoring in outcomes is adjusted for using %s\n",
-            adjust.method,
-            file=logFile
+        cat(sprintf("Any censoring in outcomes is adjusted for using %s\n",
+            adjust.method),
+            file=logFile,
+            append = TRUE
         )
 
         if(length(covariates_censor)>0){
           cat(sprintf("The following variables are used to adjust for censoring: %s",
                 paste(covariates_censor, collapse="; ")),
-                file=logFile
+              file=logFile,
+              append = TRUE
                 )
         }
         
         cat(sprintf("Allowable Type-I error (alpha) set at %0.4f\n",
             alpha),
-            file=logFile
+            file=logFile,
+            append = TRUE
         )
         
         cat(sprintf("Estimation method is %s\n",
             estimator_method),
-            file=logFile
+            file=logFile,
+            append = TRUE
         )
         
         cat(sprintf("Maximum iterations is %d\n",
             max_iter),
-            file=logFile
+            file=logFile,
+            append = TRUE
         )
         
         
-        cat("Summary of input data:\n",file = logFile)
+        cat("Summary of input data:\n",
+            file = logFile,
+            append = TRUE
+            )
         
         table1_formula <- arm
         
@@ -1256,7 +1276,13 @@ list(
             split.tables=Inf
           )
         }),collapse="\n"),
-        file=logFile
+        file=logFile,
+        append = TRUE
+        )
+        
+        cat("\n\n",
+            file = logFile,
+            append = TRUE
         )
         
         
@@ -1306,8 +1332,7 @@ list(
             estimates_by_stratum <- NULL
           }
           
-          
-          write(sprintf("Running Main Analysis"), stderr())
+          # write(sprintf("Running Main Analysis"), stderr())
           
           estimate <- run_analysis(list(data = data_sheet,
                                         outcomes=outcomes,
@@ -1325,28 +1350,45 @@ list(
           statistical.method,
           effect.measure)
           
-          cat("Primary Analysis Results:\n",file = logFile)
+          cat("Primary Analysis Results:\n",
+              file = logFile,
+              append = TRUE
+              )
           
           if(!is.null(estimate$out)){
-            cat(paste(capture.output({
-              pander::pandoc.table(
-                estimate$out,
-                style="grid",
-                split.tables=Inf
-              )
-            }),collapse="\n"),
-            file=logFile
+            cat(
+              paste(capture.output({
+                pander::pandoc.table(
+                  estimate$out,
+                  style="grid",
+                  split.tables=Inf
+                )
+              }),collapse="\n"),
+            file=logFile,
+            append = TRUE
             )
           }
           
           if(!is.null(estimate$error)){
-            cat("Returned error:\n",file = logFile)
-            cat(sprintf("%s\n",estimate$error$message),file = logFile)
+            cat("Returned error:\n",
+                file = logFile,
+                append = TRUE
+                )
+            cat(sprintf("%s\n",estimate$error$message),
+                file = logFile,
+                append = TRUE
+                )
           }
           
           if(!is.null(estimate$warning)){
-            cat("Produced warning:\n",file = logFile)
-            cat(sprintf("%s\n",estimate$warning$message),file = logFile)
+            cat("Produced warning:\n",
+                file = logFile,
+                append = TRUE
+                )
+            cat(sprintf("%s\n",estimate$warning$message),
+                file = logFile,
+                append = TRUE
+                )
           }
           
           errorList[[length(errorList)+1]] <- estimate$error
@@ -1359,7 +1401,10 @@ list(
           if(length(outcomes)>1){
             
             write(sprintf("Decomposing outcomes by facets"), stderr())  
-            cat("Breakdown by individual outcomes:\n",file = logFile)
+            cat("Breakdown by individual outcomes:\n",
+                file = logFile,
+                append = TRUE
+                )
             
             for(i in 1:length(outcomes)){
               
@@ -1368,7 +1413,10 @@ list(
               
               write(sprintf("Facet %d",i), stderr())  
               incProgress(1/total_run,detail = sprintf("Component %d..",i))
-              cat(sprintf("Facet %d\n",i),file = logFile)
+              cat(sprintf("Facet %d\n",i),
+                  file = logFile,
+                  append = TRUE
+                  )
               
               
               estimate_by_outcome <- run_analysis(list(data = data_sheet,
@@ -1395,18 +1443,31 @@ list(
                     split.tables=Inf
                   )
                 }),collapse="\n"),
-                file=logFile
+                file=logFile,
+                append = TRUE
                 )
               }
               
               if(!is.null(estimate_by_outcome$error)){
-                cat("Returned error:\n",file = logFile)
-                cat(sprintf("%s\n",estimate_by_outcome$error$message),file = logFile)
+                cat("Returned error:\n",
+                    file = logFile,
+                    append = TRUE
+                    )
+                cat(sprintf("%s\n",estimate_by_outcome$error$message),
+                    file = logFile,
+                    append = TRUE
+                    )
               }
               
               if(!is.null(estimate_by_outcome$warning)){
-                cat("Produced warning:\n",file = logFile)
-                cat(sprintf("%s\n",estimate_by_outcome$warning$message),file = logFile)
+                cat("Produced warning:\n",
+                    file = logFile,
+                    append = TRUE
+                    )
+                cat(sprintf("%s\n",estimate_by_outcome$warning$message),
+                    file = logFile,
+                    append = TRUE
+                    )
               }
               
               
@@ -1483,7 +1544,10 @@ list(
           ##### Stratified Analysis ----- 
           
           if(n_strata>0){
-            cat("Breakdown by strata:\n",file = logFile)
+            cat("Breakdown by strata:\n",
+                file = logFile,
+                append = TRUE
+                )
 
             if(length(stratum)==1){
               strata_column <- data_sheet[,stratum]
@@ -1505,7 +1569,10 @@ list(
             for(j in 1:length(stratified_data_sheet)){
               
               incProgress(1/total_run,detail = sprintf("Strata %d",j))
-              cat(sprintf("Strata %d\n",j),file = logFile)
+              cat(sprintf("Strata %d\n",j),
+                  file = logFile,
+                  append = TRUE
+                  )
               
               strata_val <- strata_values[[j]]
               
@@ -1534,18 +1601,31 @@ list(
                     split.tables=Inf
                   )
                 }),collapse="\n"),
-                file=logFile
+                file=logFile,
+                append = TRUE
                 )
               }
               
               if(!is.null(strata_estimate$error)){
-                cat("Returned error:\n",file = logFile)
-                cat(sprintf("%s\n",strata_estimate$error$message),file = logFile)
+                cat("Returned error:\n",
+                    file = logFile,
+                    append = TRUE
+                    )
+                cat(sprintf("%s\n",strata_estimate$error$message),
+                    file = logFile,
+                    append = TRUE
+                    )
               }
               
               if(!is.null(strata_estimate$warning)){
-                cat("Produced warning:\n",file = logFile)
-                cat(sprintf("%s\n",strata_estimate$warning$message),file = logFile)
+                cat("Produced warning:\n",
+                    file = logFile,
+                    append = TRUE
+                    )
+                cat(sprintf("%s\n",strata_estimate$warning$message),
+                    file = logFile,
+                    append = TRUE
+                    )
               }
               
               errorList[[length(errorList)+1]] <- strata_estimate$error
@@ -1716,7 +1796,10 @@ list(
             statistical.method,
             effect.measure)
             
-            cat("Primary Analysis Results:\n",file = logFile)
+            cat("Primary Analysis Results:\n",
+                file = logFile,
+                append = TRUE
+                )
             
             if(!is.null(estimate$out)){
               cat(paste(capture.output({
@@ -1726,18 +1809,31 @@ list(
                   split.tables=Inf
                 )
               }),collapse="\n"),
-              file=logFile
+              file=logFile,
+              append = TRUE
               )
             }
             
             if(!is.null(estimate$error)){
-              cat("Returned error:\n",file = logFile)
-              cat(sprintf("%s\n",estimate$error$message),file = logFile)
+              cat("Returned error:\n",
+                  file = logFile,
+                  append = TRUE
+                  )
+              cat(sprintf("%s\n",estimate$error$message),
+                  file = logFile,
+                  append = TRUE
+                  )
             }
             
             if(!is.null(estimate$warning)){
-              cat("Produced warning:\n",file = logFile)
-              cat(sprintf("%s\n",estimate$warning$message),file = logFile)
+              cat("Produced warning:\n",
+                  file = logFile,
+                  append = TRUE
+                  )
+              cat(sprintf("%s\n",estimate$warning$message),
+                  file = logFile,
+                  append = TRUE
+                  )
             }
             
             
@@ -1752,7 +1848,10 @@ list(
             if(n_strata>0){
               
               write(sprintf("Running Stratification"), stderr())
-              cat("Breakdown by strata:\n",file = logFile)
+              cat("Breakdown by strata:\n",
+                  file = logFile,
+                  append = TRUE
+                  )
               
               if(length(stratum)==1){
                 strata_column <- data_sheet[,stratum]
@@ -1776,10 +1875,15 @@ list(
               
               for(j in 1:length(stratified_data_sheet)){
                 
-                cat(sprintf("Strata %d\n",j),file = logFile)
+                
                 incProgress(1/total_run,detail = sprintf("Strata %d",j))
                 
                 strata_val <- strata_values[[j]]
+                
+                cat(sprintf("Strata %d: %s\n",j, strata_val),
+                    file = logFile,
+                    append = TRUE
+                    )
                 
                 strata_estimate <-  run_analysis(list(data = stratified_data_sheet[[j]],
                                                       outcomes=outcomes,
@@ -1806,18 +1910,31 @@ list(
                       split.tables=Inf
                     )
                   }),collapse="\n"),
-                  file=logFile
+                  file=logFile,
+                  append = TRUE
                   )
                 }
                 
                 if(!is.null(strata_estimate$error)){
-                  cat("Returned error:\n",file = logFile)
-                  cat(sprintf("%s\n",strata_estimate$error$message),file = logFile)
+                  cat("Returned error:\n",
+                      file = logFile,
+                      append = TRUE
+                      )
+                  cat(sprintf("%s\n",strata_estimate$error$message),
+                      file = logFile,
+                      append = TRUE
+                      )
                 }
                 
                 if(!is.null(strata_estimate$warning)){
-                  cat("Produced warning:\n",file = logFile)
-                  cat(sprintf("%s\n",strata_estimate$warning$message),file = logFile)
+                  cat("Produced warning:\n",
+                      file = logFile,
+                      append = TRUE
+                      )
+                  cat(sprintf("%s\n",strata_estimate$warning$message),
+                      file = logFile,
+                      append = TRUE
+                      )
                 }
                 
                 errorList[[length(errorList)+1]] <- strata_estimate$error
@@ -1839,7 +1956,6 @@ list(
             
           } # End if valid rank variable name
 
-         
         } else {
           
           # Default error message
@@ -2111,7 +2227,9 @@ list(
     
     reactive_force_results_update <- reactiveVal(0)
     output$DATAANALYSIS__wins_output_ui <- renderUI({
-
+      
+      settings <- isolate(SYMBOLIC_LINK__settings())
+      
       reactive_force_results_update()
       results <- DATAANALYSIS__results()
       # print(results)
@@ -2179,9 +2297,6 @@ list(
                                               methods_writeup()
                                               ))
       
-      # TODO: Add a button to save the results/configure things
-      
-
       if(!is.null(results$estimate)){
 
         out[[length(out)+1]] <- fluidRow(tags$h4("Results"))
@@ -2228,7 +2343,18 @@ list(
                       "</font>")
                  )
         )
-
+        
+        if(settings$log_enabled){
+          out[[length(out)+1]] <- fluidRow(
+            tags$hr(),
+            HTML(sprintf("Analysis log available at %s", results$logFile)),
+            actionButton("DATAANALYSIS__results_log_open","Open analysis log file"),
+            tags$hr()
+          )
+        }
+        
+        # TODO: PLOT/OUTPUT SETTINGS GO HERE
+        
 
         if(length(covariates_effect)>0){
           out[[length(out)+1]] <- fluidRow("NOTE: Proportion of pairs in template shows raw estimates for wins/losses/ties,
@@ -2273,6 +2399,13 @@ list(
       out <- do.call("tagList",out)
       out
     })
+    
+    
+    observeEvent(input$DATAANALYSIS__results_log_open,{
+      results <- isolate(DATAANALYSIS__results())
+      berryFunctions::openFile(results$logFile)
+    })
+    
     
     output$DATAANALYSIS__wins_output <- renderTable({
       DATAANALYSIS__results()$estimate

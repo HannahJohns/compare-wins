@@ -20,7 +20,8 @@ package_list <- c(
   "tidyverse",
   "httr",
   "table1",
-  "pander"
+  "pander",
+  "berryFunctions"
 )
 
 
