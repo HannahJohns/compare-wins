@@ -815,8 +815,10 @@ list(
       
       #### Error: No rank name --------------------------------------- 
       #' 
-      if(preference.method=="list" & rankName == ""){
-        out[[length(out)+1]] <- tags$li("Invalid rank name for list-based preferences")
+      if(preference.method=="list"){
+        if(rankName == ""){
+          out[[length(out)+1]] <- tags$li("Invalid rank name for list-based preferences")
+        }
       }
       
       
@@ -901,12 +903,11 @@ list(
     
     output$DATAANALYSIS__error_warning_ui <- renderUI({
       
+      
       preferences <- SYMBOLIC_LINK__preference_export()
       
       errors <- DATAANALYSIS__errors() # All errors are included in message
       warnings <- DATAANALYSIS__warnings()
-    
-      
       
       if(length(errors)>0){
         
@@ -1470,15 +1471,7 @@ list(
                     )
               }
               
-              
-              errorList[[length(errorList)+1]] <- estimate$error
-              warningList[[length(warningList)+1]] <- estimate$warning
-              estimate <- estimate$out
-              
               write(sprintf("Done"), stderr())
-              
-              
-              
               
               errorList[[length(errorList)+1]] <- estimate_by_outcome$error
               warningList[[length(warningList)+1]] <- estimate_by_outcome$warning
@@ -1528,8 +1521,7 @@ list(
                                                       estimate_by_cumulative_outcome)
               
               write(sprintf("Done"), stderr())  
-              write(sprintf("Facets 1 to %d",i), stderr())  
-              
+
               decomposed_estimate[[i]] <- left_join(
                 estimate_by_outcome,
                 estimate_by_cumulative_outcome,

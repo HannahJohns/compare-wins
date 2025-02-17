@@ -125,6 +125,8 @@ heartbeat <- function(software_version,settings){
     
     if(!is.na(prev_time) & !is.na(time)){
       timeDiff <- as.numeric(difftime(time,prev_time, units = "hours"))      
+    } else {
+      timeDiff <- -999999999  
     }
     
     # This is not good. It really should use a proper REST API but building one
