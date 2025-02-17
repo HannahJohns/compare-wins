@@ -791,6 +791,8 @@ list(
       data_sheet <- SYMBOLIC_LINK__data_sheet()
       preference.method <- input$SYMBOLIC_LINK__preferenceType
       preferences <- SYMBOLIC_LINK__preference_export()
+      rankName <- input$SYMBOLIC_LINK__preference_rank
+      
       arm <- input$DATAANALYSIS__arm
       
       out <- list()
@@ -809,6 +811,12 @@ list(
         if(length(unique(data_sheet[,arm]))!=2){
           out[[length(out)+1]] <- tags$li("Treatment group does not contain exactly 2 groups")
         }
+      }
+      
+      #### Error: No rank name --------------------------------------- 
+      #' 
+      if(preference.method=="list" & rankName == ""){
+        out[[length(out)+1]] <- tags$li("Invalid rank name for list-based preferences")
       }
       
       
@@ -833,6 +841,8 @@ list(
           }
         }
       }
+      
+      
       
   
       
@@ -1041,7 +1051,9 @@ list(
         
         
         ##### TODO: BUILD LOG OF RESULTS.
-        # settings <- SYMBOLIC_LINK__settings()
+        settings <- SYMBOLIC_LINK__settings()
+        print(settings)
+        browser()
         
         # If no log file is to be created, set logFile to "NUL" and windows will
         # dump the output
@@ -1087,7 +1099,15 @@ list(
           
         } else if (preference.method == "list"){
           
-          print(preferences[[preference.method]])
+          cat(paste(capture.output({
+            pander::pandoc.table(
+              preferences[[preference.method]]
+            )
+          }),
+          collapse="\n"),
+          file=logFile
+          )
+          
         }
 
         cat(sprintf("Analysis compares preferences across %s, where %s is the intervention group\n",
@@ -1143,12 +1163,9 @@ list(
         )
         
         
-        cat("Summary of input data:\n")
+        cat("Summary of input data:\n",file = logFile)
         
-        # TODO: THIS IS CURRENTLY BROKEN
-        browser()
-        
-        table1_formula <- "arm"
+        table1_formula <- arm
         
         if(preference.method == "heirarchical"){
           
@@ -1162,6 +1179,15 @@ list(
           
         } else if(preference.method == "list"){
           # TODO: This needs written
+          
+          table1_formula <- paste0(
+            table1_formula,"+",
+            paste(
+              intersect(colnames(data_sheet),colnames(preferences[[preference.method]])),
+              collapse="+"
+            )
+          )
+          
         }
         
         if(length(stratum)>0){
@@ -1194,16 +1220,36 @@ list(
           )
         }
         
-        table1_formula <- paste0(table1_formula,"|arm")
+        table1_formula <- sprintf("~%s|%s",table1_formula,arm)
+        
+        
+        # saveRDS(list(table1_formula=table1_formula,tab1_data_sheet = tab1_data_sheet),"tmp.RDS")
+        # tmp <- readRDS("./source/app/shiny/tmp.RDS")
+        # attach(tmp)
         
         cat(paste(capture.output({
           pander::pandoc.table(
-            as.data.frame(table1(as.formula(table1_formula),
-                                 data=(function(x){
-                                   for( i in c(arm,stratum))
+            as.data.frame(table1::table1(as.formula(table1_formula),
+                                 data= (function(x){
+                                   
+                                   to_factorise <- c(arm,stratum)
+                                  
+                                   if(preference.method == "list"){
+                                     to_factorise <- c(to_factorise,
+                                                       intersect(
+                                                         colnames(data_sheet),
+                                                         colnames(preferences[[preference.method]])
+                                                       ) 
+                                     )
+                                   }
+
+                                   
+                                   for( i in to_factorise)
                                      x[,i] <- as.factor(x[,i])
                                    x
-                                   })(data_sheet)
+                                 })(data_sheet),
+                                 render.continuous = c(.="Mean (SD)",
+                                                       .="Median [Q1 - Q3]")
             )
             ),
             style="grid",
@@ -1212,6 +1258,7 @@ list(
         }),collapse="\n"),
         file=logFile
         )
+        
         
         # All methods should should show a progress bar
         
@@ -1278,21 +1325,51 @@ list(
           statistical.method,
           effect.measure)
           
+          cat("Primary Analysis Results:\n",file = logFile)
+          
+          if(!is.null(estimate$out)){
+            cat(paste(capture.output({
+              pander::pandoc.table(
+                estimate$out,
+                style="grid",
+                split.tables=Inf
+              )
+            }),collapse="\n"),
+            file=logFile
+            )
+          }
+          
+          if(!is.null(estimate$error)){
+            cat("Returned error:\n",file = logFile)
+            cat(sprintf("%s\n",estimate$error$message),file = logFile)
+          }
+          
+          if(!is.null(estimate$warning)){
+            cat("Produced warning:\n",file = logFile)
+            cat(sprintf("%s\n",estimate$warning$message),file = logFile)
+          }
+          
           errorList[[length(errorList)+1]] <- estimate$error
           warningList[[length(warningList)+1]] <- estimate$warning
           estimate <- estimate$out
           
           write(sprintf("Done"), stderr())
           
-          # Get decomposition of results by outcome facets
+          ####Decomposed results -----------------------
           if(length(outcomes)>1){
             
             write(sprintf("Decomposing outcomes by facets"), stderr())  
+            cat("Breakdown by individual outcomes:\n",file = logFile)
+            
             for(i in 1:length(outcomes)){
               
-              write(sprintf("Facet %d",i), stderr())  
               
+              #### Individual Results by outcome -----------------------
+              
+              write(sprintf("Facet %d",i), stderr())  
               incProgress(1/total_run,detail = sprintf("Component %d..",i))
+              cat(sprintf("Facet %d\n",i),file = logFile)
+              
               
               estimate_by_outcome <- run_analysis(list(data = data_sheet,
                                                        outcomes=outcomes[i],
@@ -1310,6 +1387,38 @@ list(
               statistical.method,
               effect.measure)
               
+              if(!is.null(estimate_by_outcome$out)){
+                cat(paste(capture.output({
+                  pander::pandoc.table(
+                    estimate_by_outcome$out,
+                    style="grid",
+                    split.tables=Inf
+                  )
+                }),collapse="\n"),
+                file=logFile
+                )
+              }
+              
+              if(!is.null(estimate_by_outcome$error)){
+                cat("Returned error:\n",file = logFile)
+                cat(sprintf("%s\n",estimate_by_outcome$error$message),file = logFile)
+              }
+              
+              if(!is.null(estimate_by_outcome$warning)){
+                cat("Produced warning:\n",file = logFile)
+                cat(sprintf("%s\n",estimate_by_outcome$warning$message),file = logFile)
+              }
+              
+              
+              errorList[[length(errorList)+1]] <- estimate$error
+              warningList[[length(warningList)+1]] <- estimate$warning
+              estimate <- estimate$out
+              
+              write(sprintf("Done"), stderr())
+              
+              
+              
+              
               errorList[[length(errorList)+1]] <- estimate_by_outcome$error
               warningList[[length(warningList)+1]] <- estimate_by_outcome$warning
               estimate_by_outcome <- estimate_by_outcome$out
@@ -1321,6 +1430,12 @@ list(
                                            estimate_by_outcome)
               
               write(sprintf("Done"), stderr())  
+              
+              #### Cumulative Results by outcome -----------------------
+              
+              # Note: We're not putting this in the log file, it's only
+              # being calculated so we can produce our plots.
+              
               write(sprintf("Facets 1 to %d",i), stderr())  
               
               incProgress(1/total_run,detail = sprintf("Component %d...",i))
@@ -1365,22 +1480,21 @@ list(
           } # End if decompose at top level
           
           
+          ##### Stratified Analysis ----- 
+          
           if(n_strata>0){
-            
-            
+            cat("Breakdown by strata:\n",file = logFile)
+
             if(length(stratum)==1){
               strata_column <- data_sheet[,stratum]
             } else {
               strata_column <-apply(data_sheet[,stratum],1,paste)
             }
             
-            
-            
             stratified_data_sheet <- by(data = data_sheet,
                                         INDICES = strata_column,
                                         function(x){x}
             )
-            
             
             # This is incredibly dumb but it will work
             strata_values <- by(data = data.frame(strata_column=strata_column),
@@ -1390,8 +1504,8 @@ list(
             
             for(j in 1:length(stratified_data_sheet)){
               
-              
               incProgress(1/total_run,detail = sprintf("Strata %d",j))
+              cat(sprintf("Strata %d\n",j),file = logFile)
               
               strata_val <- strata_values[[j]]
               
@@ -1411,10 +1525,37 @@ list(
               statistical.method,
               effect.measure)
               
+              
+              if(!is.null(strata_estimate$out)){
+                cat(paste(capture.output({
+                  pander::pandoc.table(
+                    strata_estimate$out,
+                    style="grid",
+                    split.tables=Inf
+                  )
+                }),collapse="\n"),
+                file=logFile
+                )
+              }
+              
+              if(!is.null(strata_estimate$error)){
+                cat("Returned error:\n",file = logFile)
+                cat(sprintf("%s\n",strata_estimate$error$message),file = logFile)
+              }
+              
+              if(!is.null(strata_estimate$warning)){
+                cat("Produced warning:\n",file = logFile)
+                cat(sprintf("%s\n",strata_estimate$warning$message),file = logFile)
+              }
+              
               errorList[[length(errorList)+1]] <- strata_estimate$error
               warningList[[length(warningList)+1]] <- strata_estimate$warning
               strata_estimate <- strata_estimate$out
               
+              
+              ###### Decomposed outcomes by strata --------
+              # NOTE: We're not returning this in the analysis log
+              # it's far too much detail.
               
               tmp_decomposed_estimate <- lapply(1:length(outcomes), function(i){NULL})
               
@@ -1499,172 +1640,205 @@ list(
           
           out <- list(estimate=estimate,
                       decomposed_estimate=decomposed_estimate,
-                      estimates_by_stratum=estimates_by_stratum)
-        
-          
+                      estimates_by_stratum=estimates_by_stratum,
+                      logFile = logFile)
          
         ### Analysis loop (list-based) --------------
         } else if (preference.method=="list"){
-          
-          
-          # Overall
-          # tmp <- readRDS("source/app/shiny/tmp_2820d72e098f4423088ed180f06dbefd.RDS")
-          # Strata 0  
-          # tmp <- readRDS("source/app/shiny/tmp_6a496e188ff8818878c82d6087c3ef66.RDS")
-          
-          # Strata 1
-          # tmp <- readRDS("source/app/shiny/tmp_7fca5730e8bec90ae36300623297c155.RDS")
-          
-          # attach(tmp)
-
-          # statistical.method <- "wins"
-          # adjust.method <- method
-          # data_sheet <- data
-          
           
           # The easiest way to get list-based analysis working is to treat it
           # like it's heirarchical with only a single facet.
           
           rankName <- isolate(input$SYMBOLIC_LINK__preference_rank)
-
-          # If rankName is already in the data sheet, we need to rename the variable prior to joining
-
-          newRankName <- rankName
-          rename_attempts <- 0
-          while(newRankName %in% colnames(data_sheet)){
-            rename_attempts <- rename_attempts+1
-            newRankName <- sprintf("%s_%d",rankName,rename_attempts)
-          }
-          
-          
-          # If we had to rename the rank variable, it needs updated in the preferences list
           preference_list <- preferences$list
-          if(newRankName != rankName){
-            colnames(preference_list)[colnames(preference_list)==rankName] <- newRankName
-          }
           
-          # Set up outcomes as if it were a singular continuous outcome facet
+          # If rankName is already in the data sheet or not in preference list,
+          # we should stop
           
-          #TODO: This is is dangerous and needs some checks added
-          data_sheet <- left_join(
-            data_sheet,
-            preference_list
-          )
-          
-          
-          # With the data sheet built and before analysis, update any reactives that depend on it
-          DATAANALYSIS__xtab( table(data_sheet[,arm],data_sheet[,newRankName])[levels,] )
-          
-          outcomes <- list( list(
-            type="numeric",
-            var=newRankName,
-            tau=0,
-            indicator=NULL,
-            direction="<" # Rank 1 is best
-          ))
-      
-          # if(statistical.method != "debug"){
-          #   errorList[[length(errorList)+1]] <- tryCatch({stop("List method currently in debug mode only")},error=function(e){e})
-          # }
-          
-          total_run <- 1 # Main results
-          
-          if(n_strata>0){
-            estimates_by_stratum <- lapply(1:n_strata, function(i){NULL})
-            total_run <- total_run + n_strata
+          if(rankName %in% colnames(data_sheet) | !(rankName %in% colnames(preference_list))){
+            
+            errorList[[length(errorList)+1]] <- tryCatch(stop("Invalid rank column name"),
+                                                         error=function(e){e})
+            
+            
           } else {
-            estimates_by_stratum <- NULL
-          }
-          
-          
-          write(sprintf("Running Main Analysis"), stderr())
-          
-          estimate <- run_analysis(list(data = data_sheet,
-                                        outcomes=outcomes,
-                                        arm=arm,
-                                        levels=levels,
-                                        stratum = stratum,
-                                        stratum.weight = stratum.weight,
-                                        covariates_effect = covariates_effect,
-                                        covariates_censor = covariates_censor,
-                                        method = adjust.method,
-                                        alpha = alpha,
-                                        estimator_method = estimator_method,
-                                        max_iter = max_iter
-          ),
-          statistical.method,
-          effect.measure)
-          
-          errorList[[length(errorList)+1]] <- estimate$error
-          warningList[[length(warningList)+1]] <- estimate$warning
-          estimate <- estimate$out
-          
-          write(sprintf("Done"), stderr())
-          
-          
-          if(n_strata>0){
             
-            write(sprintf("Running Stratification"), stderr())
+            # Set up outcomes as if it were a singular continuous outcome facet
             
+            #TODO: This is is dangerous and needs some checks added
+            # There's a bug that occurs when we have duplicated names.
+            # Set name to Rankin and see what happens.
+            data_sheet <- left_join(
+              data_sheet,
+              preference_list
+            )
             
-            if(length(stratum)==1){
-              strata_column <- data_sheet[,stratum]
+            # With the data sheet built and before analysis, update any reactives that depend on it
+            DATAANALYSIS__xtab( table(data_sheet[,arm],data_sheet[,rankName])[levels,] )
+            
+            outcomes <- list( list(
+              type="numeric",
+              var=rankName,
+              tau=0,
+              indicator=NULL,
+              direction="<" # Rank 1 is best
+            ))
+            
+            # if(statistical.method != "debug"){
+            #   errorList[[length(errorList)+1]] <- tryCatch({stop("List method currently in debug mode only")},error=function(e){e})
+            # }
+            
+            total_run <- 1 # Main results
+            
+            if(n_strata>0){
+              estimates_by_stratum <- lapply(1:n_strata, function(i){NULL})
+              total_run <- total_run + n_strata
             } else {
-              strata_column <-apply(data_sheet[,stratum],1,paste)
+              estimates_by_stratum <- NULL
             }
             
             
+            write(sprintf("Running Main Analysis"), stderr())
             
-            stratified_data_sheet <- by(data = data_sheet,
-                                        INDICES = strata_column,
-                                        function(x){x}
-            )
+            estimate <- run_analysis(list(data = data_sheet,
+                                          outcomes=outcomes,
+                                          arm=arm,
+                                          levels=levels,
+                                          stratum = stratum,
+                                          stratum.weight = stratum.weight,
+                                          covariates_effect = covariates_effect,
+                                          covariates_censor = covariates_censor,
+                                          method = adjust.method,
+                                          alpha = alpha,
+                                          estimator_method = estimator_method,
+                                          max_iter = max_iter
+            ),
+            statistical.method,
+            effect.measure)
+            
+            cat("Primary Analysis Results:\n",file = logFile)
+            
+            if(!is.null(estimate$out)){
+              cat(paste(capture.output({
+                pander::pandoc.table(
+                  estimate$out,
+                  style="grid",
+                  split.tables=Inf
+                )
+              }),collapse="\n"),
+              file=logFile
+              )
+            }
+            
+            if(!is.null(estimate$error)){
+              cat("Returned error:\n",file = logFile)
+              cat(sprintf("%s\n",estimate$error$message),file = logFile)
+            }
+            
+            if(!is.null(estimate$warning)){
+              cat("Produced warning:\n",file = logFile)
+              cat(sprintf("%s\n",estimate$warning$message),file = logFile)
+            }
             
             
-            # This is incredibly dumb but it will work
-            strata_values <- by(data = data.frame(strata_column=strata_column),
-                                INDICES = strata_column,
-                                function(x){unique(x$strata_column)}
-            )
+            errorList[[length(errorList)+1]] <- estimate$error
+            warningList[[length(warningList)+1]] <- estimate$warning
+            estimate <- estimate$out
             
-            for(j in 1:length(stratified_data_sheet)){
-              
-              
-              incProgress(1/total_run,detail = sprintf("Strata %d",j))
-              
-              strata_val <- strata_values[[j]]
-              
-              strata_estimate <-  run_analysis(list(data = stratified_data_sheet[[j]],
-                                                    outcomes=outcomes,
-                                                    arm=arm,
-                                                    levels=levels,
-                                                    stratum = stratum,
-                                                    stratum.weight = stratum.weight,
-                                                    covariates_effect = covariates_effect,
-                                                    covariates_censor = covariates_censor,
-                                                    method = adjust.method,
-                                                    alpha = alpha,
-                                                    estimator_method = estimator_method,
-                                                    max_iter = max_iter
-              ),
-              statistical.method,
-              effect.measure)
-              
-              errorList[[length(errorList)+1]] <- strata_estimate$error
-              warningList[[length(warningList)+1]] <- strata_estimate$warning
-              strata_estimate <- strata_estimate$out
-              
-              estimates_by_stratum[[j]] <- list(strata_val = strata_val,
-                                                estimate=strata_estimate,
-                                                decomposed_estimate=NULL)
-              
-            } # End for strata
+            write(sprintf("Done"), stderr())
             
-          } # End if strata
-          
-          out <- list(estimate=estimate,
-                      decomposed_estimate=NULL,
-                      estimates_by_stratum=estimates_by_stratum)
+            ##### Stratified Analysis ------
+            
+            if(n_strata>0){
+              
+              write(sprintf("Running Stratification"), stderr())
+              cat("Breakdown by strata:\n",file = logFile)
+              
+              if(length(stratum)==1){
+                strata_column <- data_sheet[,stratum]
+              } else {
+                strata_column <-apply(data_sheet[,stratum],1,paste)
+              }
+              
+              
+              
+              stratified_data_sheet <- by(data = data_sheet,
+                                          INDICES = strata_column,
+                                          function(x){x}
+              )
+              
+              
+              # This is incredibly dumb but it will work
+              strata_values <- by(data = data.frame(strata_column=strata_column),
+                                  INDICES = strata_column,
+                                  function(x){unique(x$strata_column)}
+              )
+              
+              for(j in 1:length(stratified_data_sheet)){
+                
+                cat(sprintf("Strata %d\n",j),file = logFile)
+                incProgress(1/total_run,detail = sprintf("Strata %d",j))
+                
+                strata_val <- strata_values[[j]]
+                
+                strata_estimate <-  run_analysis(list(data = stratified_data_sheet[[j]],
+                                                      outcomes=outcomes,
+                                                      arm=arm,
+                                                      levels=levels,
+                                                      stratum = stratum,
+                                                      stratum.weight = stratum.weight,
+                                                      covariates_effect = covariates_effect,
+                                                      covariates_censor = covariates_censor,
+                                                      method = adjust.method,
+                                                      alpha = alpha,
+                                                      estimator_method = estimator_method,
+                                                      max_iter = max_iter
+                ),
+                statistical.method,
+                effect.measure)
+                
+                
+                if(!is.null(strata_estimate$out)){
+                  cat(paste(capture.output({
+                    pander::pandoc.table(
+                      strata_estimate$out,
+                      style="grid",
+                      split.tables=Inf
+                    )
+                  }),collapse="\n"),
+                  file=logFile
+                  )
+                }
+                
+                if(!is.null(strata_estimate$error)){
+                  cat("Returned error:\n",file = logFile)
+                  cat(sprintf("%s\n",strata_estimate$error$message),file = logFile)
+                }
+                
+                if(!is.null(strata_estimate$warning)){
+                  cat("Produced warning:\n",file = logFile)
+                  cat(sprintf("%s\n",strata_estimate$warning$message),file = logFile)
+                }
+                
+                errorList[[length(errorList)+1]] <- strata_estimate$error
+                warningList[[length(warningList)+1]] <- strata_estimate$warning
+                strata_estimate <- strata_estimate$out
+                
+                estimates_by_stratum[[j]] <- list(strata_val = strata_val,
+                                                  estimate=strata_estimate,
+                                                  decomposed_estimate=NULL)
+                
+              } # End for strata
+              
+            } # End if strata
+            
+            out <- list(estimate=estimate,
+                        decomposed_estimate=NULL,
+                        estimates_by_stratum=estimates_by_stratum,
+                        logFile = logFile)
+            
+          } # End if valid rank variable name
+
          
         } else {
           

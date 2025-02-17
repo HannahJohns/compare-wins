@@ -302,7 +302,8 @@ list(
         }
       } else {
         
-        data <- PREFDEF__preference_sheet()
+        data_sheet <- SYMBOLIC_LINK__data_sheet()
+        preference_data <- PREFDEF__preference_sheet()
         
         #TODO: At present, we assume that we merge works properly.
         # We need to add the following:
@@ -311,12 +312,31 @@ list(
         # 2. Need to add a pre-check for any values in the data sheet that
         #    aren't in the preference list
         
+        invalid_preference_warning <- NULL
+        if(
+           
+           length(setdiff(colnames(preference_data),colnames(data_sheet))) == 0 &
+           length(colnames(preference_data)) > 0
+           
+          ){
+          invalid_preference_warning <- tagList(
+            tags$b(style="color:red;","NO VALID RANK COLUMN FOUND."),
+            tags$br(),
+            tags$p("Column name cannot match any column in the primary data sheet. If ranks are already
+                    in this data sheet, please use a heirarchical preference definition with one preference component (the rank column)"
+            ),
+            tags$br()
+          )
+        }
+        
+        
         out <- sidebarLayout(
           sidebarPanel(
             fileInput("PREFDEF__preference_file","Select a file"),
+            invalid_preference_warning,
             selectInput("PREFDEF__preference_rank",
                         label = "Rank column",
-                        choices = colnames(data)
+                        choices = setdiff(colnames(preference_data),colnames(data_sheet))
                         )
           ),
           mainPanel(
