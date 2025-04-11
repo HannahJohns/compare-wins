@@ -1414,7 +1414,7 @@ list(
               
               write(sprintf("Facet %d",i), stderr())  
               incProgress(1/total_run,detail = sprintf("Component %d..",i))
-              cat(sprintf("Facet %d\n",i),
+              cat(sprintf("\nFacet %d\n",i),
                   file = logFile,
                   append = TRUE
                   )
