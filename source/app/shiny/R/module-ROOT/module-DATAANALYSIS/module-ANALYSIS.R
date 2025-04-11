@@ -1120,28 +1120,31 @@ list(
 
         cat(sprintf("\n\nAnalysis compares preferences across %s, where %s is the intervention group\n",
                     arm,
-                    levels[length(levels)]
+                    isolate(input$DATAANALYSIS__arm_active_selectInput)
                     ),
             file=logFile,
             append = TRUE
         )
         
         if(length(stratum)>0){
-          cat("Analysis is stratified by %s\n",
-              paste(stratum, collapse="; "),
+          cat(sprintf("Analysis is stratified by %s\n",
+              paste(stratum, collapse="; ")
+              ),
               file=logFile,
               append = TRUE
               )
-          cat("Stratum are combined using %s weights\n",
-              stratum.weight,
+          cat(sprintf("Stratum are combined using %s weights\n",
+              stratum.weight
+              ),
               file=logFile,
               append = TRUE
               )
         }
 
         if(length(covariates_effect)>0){
-          cat("Effects are adjusted for %s\n",
-              paste(covariates_effect, collapse="; "),
+          cat(sprintf("Effects are adjusted for %s\n",
+              paste(covariates_effect, collapse="; ")
+              ),
               file=logFile,
               append = TRUE
           )
@@ -1181,7 +1184,7 @@ list(
         )
         
         
-        cat("Summary of input data:\n",
+        cat("\n\nSummary of input data:\n",
             file = logFile,
             append = TRUE
             )
@@ -1402,7 +1405,7 @@ list(
           if(length(outcomes)>1){
             
             write(sprintf("Decomposing outcomes by facets"), stderr())  
-            cat("Breakdown by individual outcomes:\n",
+            cat("\n\nBreakdown by individual outcomes:\n",
                 file = logFile,
                 append = TRUE
                 )
@@ -1536,7 +1539,7 @@ list(
           ##### Stratified Analysis ----- 
           
           if(n_strata>0){
-            cat("Breakdown by strata:\n",
+            cat("\n\nBreakdown by strata:\n",
                 file = logFile,
                 append = TRUE
                 )
