@@ -470,6 +470,8 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
     # NOTE: Win Odds is adjusted for covariates, but individual win/loss/tie proportions are not.
     # This needs flagged somewhere
     
+    warning("wins losses and ties for PIM are unweighted and ignore stratification")
+    
     wlt_count <- table(c(sign(outer(
       formatted_data[formatted_data[,arm]==levels[2],"RESERVED__ranked_result"],
       formatted_data[formatted_data[,arm]==levels[1],"RESERVED__ranked_result"],
@@ -616,6 +618,26 @@ wins_wrapper <- function(data, outcomes, arm, levels,
     estimates$tie <- 1 - (out$Win_prop$P_trt + out$Win_prop$P_con)
     
   } else {
+    
+    #TODO: Get wins/losses/ties in stratified analysis.
+    # This can be manually extracted.
+    
+    warning("Weighted count of wins, losses and ties is not yet implemented
+            for stratified analysis")
+    
+    if( stratum.weight == "MH-type"){
+      weight = 1
+    } else if( "wt.stratum1" ) {
+      weight = 1
+    } else if( "wt.stratum2" ) {
+      weight = 1
+    } else if( "equal" ) {
+      weight = 1
+    }
+    
+    
+    
+    
     estimates$win <- NA
     estimates$loss <- NA    
     estimates$tie <- NA
