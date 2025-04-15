@@ -167,11 +167,30 @@ heartbeat <- function(software_version,settings){
 # break once we start adding e.g. plots, so it needs standardised.
 
 run_analysis <- function(args, method, effect.measure){
-
+  
+  
+  if(TRUE){
+    # Save results to a trace object so we can reload them later and debug
     
+    traceobj <- list(args=args, method=method,
+                     effect.measure=effect.measure)
+    
+    saveRDS(
+      traceobj,
+      file = sprintf("trace_%s.RDS",digest::digest(traceobj,algo = "md5"))
+    )
+    
+    # traceobj <- readRDS("source/app/shiny/trace_eff2617fb40a5be9c53a66bf3485ce2c.RDS")
+    # traceobj$args
+    
+    # args=traceobj$args
+    # method=traceobj$method
+    # effect.measure=traceobj$effect.measure
+    
+  }
+
   # print(sprintf("Running %s with args",method))
   # print(args[setdiff])
-  
   
   # Some sort of default value
   out <- data.frame(outcome=NA,
@@ -622,25 +641,66 @@ wins_wrapper <- function(data, outcomes, arm, levels,
     #TODO: Get wins/losses/ties in stratified analysis.
     # This can be manually extracted.
     
-    warning("Weighted count of wins, losses and ties is not yet implemented
-            for stratified analysis")
+    # N is sample size per strata
+    # N_event is number of events per arm.
+    # Based on the following code:
     
-    if( stratum.weight == "MH-type"){
-      weight = 1
-    } else if( "wt.stratum1" ) {
-      weight = 1
-    } else if( "wt.stratum2" ) {
-      weight = 1
-    } else if( "equal" ) {
-      weight = 1
+    # https://github.com/cran/WINS/blob/master/R/unadjusted.win.stat.R#L146
+    
+    # It looks like number of events is based on if there is
+    # at least one event on any component, i.e. we fall back to composite
+    # tte for estimating these weights.
+    
+    
+    xtab <- table(
+      formatted_data$stratum,
+      formatted_data$arm
+    )
+
+    N = apply(xtab,1,sum)
+    
+    total_pairs <- apply(xtab,1,prod)
+    
+    if(any(ep_type=="tte")){
+      ind.tte <- which(ep_type == "tte")
+      n_tte <- length(ind.tte)
+      
+      N_event <- apply(as.matrix(
+        formatted_data[,sprintf("Delta_%d",ind.tte)],
+        ncol = n_tte), 1, function(x) max(x)>0)
+      
+      N_event <- tapply(N_event,formatted_data$stratum,sum)
+      
+    } else {
+      N_event=N
     }
     
     
+    w_stratum = switch(stratum.weight,
+                       "unstratified" = 1,
+                       "equal" = rep(1/length(N),length(N)),
+                       "MH-type" = (1/N)/sum(1/N),
+                       "wt.stratum1" = N/sum(N),
+                       "wt.stratum2" = N_event/sum(N_event)
+               )
     
     
-    estimates$win <- NA
-    estimates$loss <- NA    
-    estimates$tie <- NA
+    
+    wins <- out$Win_prop[,"P_trt"]*total_pairs
+    losses <- out$Win_prop[,"P_con"]*total_pairs
+    ties <- total_pairs - wins - losses
+    
+    
+    estimates$win <- sum(w_stratum*wins)
+    estimates$loss <- sum(w_stratum*losses)    
+    estimates$tie <- sum(w_stratum*ties)
+    
+    total_pairs <- estimates$win + estimates$loss +  estimates$tie
+    
+    estimates$win  <-  estimates$win/total_pairs
+    estimates$loss  <-  estimates$loss/total_pairs
+    estimates$tie  <-  estimates$tie/total_pairs
+    
   }
   
   estimates
