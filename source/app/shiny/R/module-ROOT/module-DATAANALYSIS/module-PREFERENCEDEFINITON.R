@@ -245,7 +245,7 @@ list(
                        div(
                        selectInput(inputId = sprintf("PREFDEF__component_type_%d",i),
                                    label = "This outcome is:",
-                                   choices = c("Numeric"="numeric","Ordinal"="ordinal","Survival"="surv"),
+                                   choices = c("Numeric"="numeric","Survival"="surv"),
                                    selected=new_preferences[[i]][["type"]]
                        )),
                        div(

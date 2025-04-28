@@ -424,25 +424,52 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
     
   }
   
+  if(length(covariates)>0){
+    warning("Estimates of Wins, Losses and Ties do not adjust for continuous covariates.")
+  }
+  
   if(stratum.weight=="ivw"){
+    
+    warning("Inverse variance weighting combines wins, losses and ties in a complex fashion. The weighted counts for wins losses and ties will not exactly match the reported win ratio.")
 
     fit <- by(formatted_data,stratum, function(tmpdf){
-      pim(formula,
+      
+      wlt_count <- table(c(sign(outer(
+        tmpdf[tmpdf[,arm]==levels[2],"RESERVED__ranked_result"],
+        tmpdf[tmpdf[,arm]==levels[1],"RESERVED__ranked_result"],
+        "-"
+      ))))
+      wlt_count <- wlt_count/sum(wlt_count)
+      names(wlt_count) <- c("-1"="loss","0"="tie","1"="win")[names(wlt_count)]
+
+      fit <- pim(formula,
           data=tmpdf,
           link = link,
           model = model,
           estim=estim)
+      
+      list(fit=fit,wlt_count=wlt_count)
+      
     })
+    
     
     fit <- do.call("rbind",lapply(fit,function(x){
       data.frame(
-        estimate=coef(x)[paste0(arm,levels[2])],
-        var=diag(vcov(x))[paste0(arm,levels[2])]
+        estimate=coef(x$fit)[paste0(arm,levels[2])],
+        var=diag(vcov(x$fit))[paste0(arm,levels[2])],
+        win=x$wlt_count["win"],
+        tie=x$wlt_count["tie"],
+        loss=x$wlt_count["loss"]
         )
     }))
 
     coefs <- sum(fit[,"estimate"]/fit[,"var"])/sum(1/fit[,"var"])
     var <- 1/sum(1/fit[,"var"])
+    
+    loss <- exp(sum(log(fit[,"loss"])*(1/fit[,"var"]))*(1/sum(1/fit[,"var"])))
+    win <- exp(sum(log(fit[,"win"])*(1/fit[,"var"])) *(1/sum(1/fit[,"var"])))
+    # tie <- exp(sum(log(fit[,"tie"])*(1/fit[,"var"])) *(1/sum(1/fit[,"var"])))
+    tie <- 1-(loss+win)
     
     conf_interval <- coefs + c(lower=-1,upper=1)*sqrt(var)*qnorm(1-alpha/2)
     pval <- 2*pnorm(abs(coefs/sqrt(var)),lower.tail = F)
@@ -458,12 +485,11 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
                       lower=conf_interval[1],
                       upper=conf_interval[2],
                       p=pval,
-                      win=NA,
-                      loss=NA,
-                      tie=NA)
+                      win=win,
+                      loss=loss,
+                      tie=tie)
     
   } else if (stratum.weight=="unstratified"){
-    
     
     fit <- pim(formula,
                data=formatted_data,
@@ -485,12 +511,7 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
     
     
     # Get win/losses/ties. This can be done by getting sign(diff(treatment, control))
-    
-    # NOTE: Win Odds is adjusted for covariates, but individual win/loss/tie proportions are not.
-    # This needs flagged somewhere
-    
-    warning("wins losses and ties for PIM are unweighted and ignore stratification")
-    
+
     wlt_count <- table(c(sign(outer(
       formatted_data[formatted_data[,arm]==levels[2],"RESERVED__ranked_result"],
       formatted_data[formatted_data[,arm]==levels[1],"RESERVED__ranked_result"],
