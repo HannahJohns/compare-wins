@@ -169,7 +169,7 @@ heartbeat <- function(software_version,settings){
 run_analysis <- function(args, method, effect.measure){
   
   
-  if(TRUE){
+  if(FALSE){
     # Save results to a trace object so we can reload them later and debug
     
     traceobj <- list(args=args, method=method,
@@ -430,8 +430,6 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
   
   if(stratum.weight=="ivw"){
     
-    warning("Inverse variance weighting combines wins, losses and ties in a complex fashion. The weighted counts for wins losses and ties will not exactly match the reported win ratio.")
-
     fit <- by(formatted_data,stratum, function(tmpdf){
       
       wlt_count <- table(c(sign(outer(
@@ -466,9 +464,22 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
     coefs <- sum(fit[,"estimate"]/fit[,"var"])/sum(1/fit[,"var"])
     var <- 1/sum(1/fit[,"var"])
     
-    loss <- exp(sum(log(fit[,"loss"])*(1/fit[,"var"]))*(1/sum(1/fit[,"var"])))
-    win <- exp(sum(log(fit[,"win"])*(1/fit[,"var"])) *(1/sum(1/fit[,"var"])))
-    # tie <- exp(sum(log(fit[,"tie"])*(1/fit[,"var"])) *(1/sum(1/fit[,"var"])))
+    # Estimate wins losses and ties by solving the following set of simultaneous equations:
+    
+    # R = Wins/Losses                                  R estimated from the ratio of geometric mean win/loss proportions
+    # 1 = Wins + Losses + Ties 
+    # E = (Wins + 0.5 * Ties) / (Losses + 0.5 * Ties)  E is estimated win odds
+    
+    R <- exp(sum(log(fit[,"win"])*(1/fit[,"var"])) *(1/sum(1/fit[,"var"]))) /
+         exp(sum(log(fit[,"loss"])*(1/fit[,"var"]))*(1/sum(1/fit[,"var"])))
+    
+    E <- exp(coefs)
+
+    # Algebraic manipulation gives the following:
+    loss <- (0.5 * (1-E))/(E - R + 0.5*(1-E)*(R+1))
+    
+    # Back-substitution solves the rest
+    win <- R * loss
     tie <- 1-(loss+win)
     
     conf_interval <- coefs + c(lower=-1,upper=1)*sqrt(var)*qnorm(1-alpha/2)
