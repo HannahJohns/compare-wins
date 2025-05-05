@@ -5,8 +5,8 @@ source("R/misc_functions.R")
 
 software_version <- c(major=0,
                       minor=5,
-                      patch=2,
-                      build=9001)
+                      patch=3,
+                      build=NULL)
 
 module_list <- dir("R/module-ROOT/",recursive = T)
 # Get things that have filenames that look like modules.
@@ -49,10 +49,6 @@ inputCollection <- function(input_names,input_index){
 }
 
 
-
-
-
-
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
   
@@ -89,8 +85,6 @@ server <- function(input, output, session) {
       ))
     }
   })
-  
-  
   
   output$software_version_display <- renderText(
     sprintf("v%s",paste(software_version,collapse="."))
