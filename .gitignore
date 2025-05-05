@@ -61,3 +61,4 @@ scratchSpace.R
 releases/
 *.RDS
 source/log.txt
+source/app/shiny/logs/*.txt
