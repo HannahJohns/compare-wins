@@ -31,15 +31,24 @@
 # method <- "pim"
 
 
-check_update <- function(software_version){
+check_update <- function(software_version, settings){
   
+  if(!settings$update_check){
+    print("Update check skipped")
+    return(list(needed = F,new_tag=NULL,message=NULL,url=NULL))
+  } 
+  
+  
+  print("Checking for updates")
+  startTime <- Sys.time()
+  
+    
   update_flagged <- FALSE
   
   # Make API call to github to check for updates on launch
   api_results <- tryCatch({
     httr::content(httr::GET("https://api.github.com/repos/HannahJohns/compare-wins/releases/latest"))
   }, error=function(e){list(status="ERROR")})
-  
   
   
   if(is.null(api_results$status)){
@@ -86,9 +95,63 @@ check_update <- function(software_version){
     update_check <- list(needed = F,new_tag=NULL,message=NULL,url=NULL)
   }
   
+  
+  endTime <- Sys.time()
+  print(sprintf("Done, took %s", difftime(endTime,startTime)))
+  
   update_check
   
 }
+
+
+heartbeat <- function(software_version,settings){
+  
+  if(settings$heartbeat){
+    
+    print("Sending usage ping")
+    startTime <- Sys.time()
+    
+    prev_time <- tryCatch({
+      tmp <- readRDS("heartbeat_time.RDS")
+      if(!is.POSIXct(tmp)) stop("heartbeat is not POSIXct")
+      tmp
+    }, error=function(e){NA})
+    
+    
+    time <- Sys.time()
+    tryCatch({
+      saveRDS(time,"heartbeat_time.RDS")
+    })
+    
+    if(!is.na(prev_time) & !is.na(time)){
+      timeDiff <- as.numeric(difftime(time,prev_time, units = "hours"))      
+    } else {
+      timeDiff <- -999999999  
+    }
+    
+    # This is not good. It really should use a proper REST API but building one
+    # is currently beyond my skillset.
+    
+    usage_data <- jsonlite::toJSON(
+      list(version=paste(software_version,collapse="."), timeDiff=timeDiff)
+    )
+    url <- sprintf("https://htjohns.com/pings/ping.php?app=comparewins&message=%s",usage_data)
+    
+    tryCatch({
+      con <- curl::curl(url)
+      readLines(con, warn = FALSE)  
+      close(con)
+    })
+    
+    endTime <- Sys.time()
+    print(sprintf("Done, took %s", difftime(endTime,startTime)))
+
+  } else {
+    print("Ping disabled, skipped")
+  }
+  
+}
+
 
 
 # Infrastructure functions ##################################
@@ -105,9 +168,29 @@ check_update <- function(software_version){
 
 run_analysis <- function(args, method, effect.measure){
   
-  print(sprintf("Running %s with args",method))
-  print(args)
   
+  if(FALSE){
+    # Save results to a trace object so we can reload them later and debug
+    
+    traceobj <- list(args=args, method=method,
+                     effect.measure=effect.measure)
+    
+    saveRDS(
+      traceobj,
+      file = sprintf("trace_%s.RDS",digest::digest(traceobj,algo = "md5"))
+    )
+    
+    # traceobj <- readRDS("source/app/shiny/trace_eff2617fb40a5be9c53a66bf3485ce2c.RDS")
+    # traceobj$args
+    
+    # args=traceobj$args
+    # method=traceobj$method
+    # effect.measure=traceobj$effect.measure
+    
+  }
+
+  # print(sprintf("Running %s with args",method))
+  # print(args[setdiff])
   
   # Some sort of default value
   out <- data.frame(outcome=NA,
@@ -341,25 +424,63 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
     
   }
   
+  if(length(covariates)>0){
+    warning("Estimates of Wins, Losses and Ties do not adjust for continuous covariates.")
+  }
+  
   if(stratum.weight=="ivw"){
-
+    
     fit <- by(formatted_data,stratum, function(tmpdf){
-      pim(formula,
+      
+      wlt_count <- table(c(sign(outer(
+        tmpdf[tmpdf[,arm]==levels[2],"RESERVED__ranked_result"],
+        tmpdf[tmpdf[,arm]==levels[1],"RESERVED__ranked_result"],
+        "-"
+      ))))
+      wlt_count <- wlt_count/sum(wlt_count)
+      names(wlt_count) <- c("-1"="loss","0"="tie","1"="win")[names(wlt_count)]
+
+      fit <- pim(formula,
           data=tmpdf,
           link = link,
           model = model,
           estim=estim)
+      
+      list(fit=fit,wlt_count=wlt_count)
+      
     })
+    
     
     fit <- do.call("rbind",lapply(fit,function(x){
       data.frame(
-        estimate=coef(x)[paste0(arm,levels[2])],
-        var=diag(vcov(x))[paste0(arm,levels[2])]
+        estimate=coef(x$fit)[paste0(arm,levels[2])],
+        var=diag(vcov(x$fit))[paste0(arm,levels[2])],
+        win=x$wlt_count["win"],
+        tie=x$wlt_count["tie"],
+        loss=x$wlt_count["loss"]
         )
     }))
 
     coefs <- sum(fit[,"estimate"]/fit[,"var"])/sum(1/fit[,"var"])
     var <- 1/sum(1/fit[,"var"])
+    
+    # Estimate wins losses and ties by solving the following set of simultaneous equations:
+    
+    # R = Wins/Losses                                  R estimated from the ratio of geometric mean win/loss proportions
+    # 1 = Wins + Losses + Ties 
+    # E = (Wins + 0.5 * Ties) / (Losses + 0.5 * Ties)  E is estimated win odds
+    
+    R <- exp(sum(log(fit[,"win"])*(1/fit[,"var"])) *(1/sum(1/fit[,"var"]))) /
+         exp(sum(log(fit[,"loss"])*(1/fit[,"var"]))*(1/sum(1/fit[,"var"])))
+    
+    E <- exp(coefs)
+
+    # Algebraic manipulation gives the following:
+    loss <- (0.5 * (1-E))/(E - R + 0.5*(1-E)*(R+1))
+    
+    # Back-substitution solves the rest
+    win <- R * loss
+    tie <- 1-(loss+win)
     
     conf_interval <- coefs + c(lower=-1,upper=1)*sqrt(var)*qnorm(1-alpha/2)
     pval <- 2*pnorm(abs(coefs/sqrt(var)),lower.tail = F)
@@ -375,12 +496,11 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
                       lower=conf_interval[1],
                       upper=conf_interval[2],
                       p=pval,
-                      win=NA,
-                      loss=NA,
-                      tie=NA)
+                      win=win,
+                      loss=loss,
+                      tie=tie)
     
   } else if (stratum.weight=="unstratified"){
-    
     
     fit <- pim(formula,
                data=formatted_data,
@@ -402,10 +522,7 @@ pim_wrapper <-  function(data, outcomes, arm, levels,
     
     
     # Get win/losses/ties. This can be done by getting sign(diff(treatment, control))
-    
-    # NOTE: Win Odds is adjusted for covariates, but individual win/loss/tie proportions are not.
-    # This needs flagged somewhere
-    
+
     wlt_count <- table(c(sign(outer(
       formatted_data[formatted_data[,arm]==levels[2],"RESERVED__ranked_result"],
       formatted_data[formatted_data[,arm]==levels[1],"RESERVED__ranked_result"],
@@ -552,9 +669,70 @@ wins_wrapper <- function(data, outcomes, arm, levels,
     estimates$tie <- 1 - (out$Win_prop$P_trt + out$Win_prop$P_con)
     
   } else {
-    estimates$win <- NA
-    estimates$loss <- NA    
-    estimates$tie <- NA
+    
+    #TODO: Get wins/losses/ties in stratified analysis.
+    # This can be manually extracted.
+    
+    # N is sample size per strata
+    # N_event is number of events per arm.
+    # Based on the following code:
+    
+    # https://github.com/cran/WINS/blob/master/R/unadjusted.win.stat.R#L146
+    
+    # It looks like number of events is based on if there is
+    # at least one event on any component, i.e. we fall back to composite
+    # tte for estimating these weights.
+    
+    
+    xtab <- table(
+      formatted_data$stratum,
+      formatted_data$arm
+    )
+
+    N = apply(xtab,1,sum)
+    
+    total_pairs <- apply(xtab,1,prod)
+    
+    if(any(ep_type=="tte")){
+      ind.tte <- which(ep_type == "tte")
+      n_tte <- length(ind.tte)
+      
+      N_event <- apply(as.matrix(
+        formatted_data[,sprintf("Delta_%d",ind.tte)],
+        ncol = n_tte), 1, function(x) max(x)>0)
+      
+      N_event <- tapply(N_event,formatted_data$stratum,sum)
+      
+    } else {
+      N_event=N
+    }
+    
+    
+    w_stratum = switch(stratum.weight,
+                       "unstratified" = 1,
+                       "equal" = rep(1/length(N),length(N)),
+                       "MH-type" = (1/N)/sum(1/N),
+                       "wt.stratum1" = N/sum(N),
+                       "wt.stratum2" = N_event/sum(N_event)
+               )
+    
+    
+    
+    wins <- out$Win_prop[,"P_trt"]*total_pairs
+    losses <- out$Win_prop[,"P_con"]*total_pairs
+    ties <- total_pairs - wins - losses
+    
+    
+    estimates$win <- sum(w_stratum*wins)
+    estimates$loss <- sum(w_stratum*losses)    
+    estimates$tie <- sum(w_stratum*ties)
+    
+    total_pairs <- estimates$win + estimates$loss +  estimates$tie
+    
+    estimates$win  <-  estimates$win/total_pairs
+    estimates$loss  <-  estimates$loss/total_pairs
+    estimates$tie  <-  estimates$tie/total_pairs
+    
   }
   
   estimates
@@ -795,10 +973,10 @@ pp_plot <- function(x0,x1,
   rbind(
     tieGrid %>%
       mutate(weight=xmax-xmin, group=1) %>%
-      select(rank=rank0,group,weight=weight),
+      dplyr::select(rank=rank0,group,weight=weight),
     tieGrid %>%
       mutate(weight=ymax-ymin, group=0) %>%
-      select(rank=rank0,group,weight=weight)
+      dplyr::select(rank=rank0,group,weight=weight)
   ) %>% 
     mutate(weight=weight*ifelse(group==1,sum(x1),sum(x0)),
                rank=factor(rank)) -> propodds_df
@@ -915,7 +1093,7 @@ analysis_results_to_wr_df <- function(df,df_overall){
   
   # Force data frame into correct structure
   df %>%
-    select(
+    dplyr::select(
       level,
       level_names=level_var,
       win_inherit,
@@ -940,7 +1118,7 @@ analysis_results_to_wr_df <- function(df,df_overall){
            level=max(df$level)+1,
            level_var="Overall"
     ) %>%
-    select(
+    dplyr::select(
       level,
       level_names=level_var,
       win_inherit,

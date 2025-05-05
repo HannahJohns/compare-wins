@@ -1,35 +1,20 @@
-library(MASS)
 
-library(shiny)
-library(DT)
-
-library(simsalapar)
-library(pim)
-library(WINS)
-
-library(patchwork)
-library(rankinPlot)
-
-library(rlang)
-library(tidyverse)
-library(httr)
+source("R/load_packages.R")
 
 source("R/misc_functions.R")
 
-
-
 software_version <- c(major=0,
                       minor=5,
-                      patch=1,
+                      patch=3,
                       build=NULL)
 
-update_flagged <- check_update(software_version)
-
-
 module_list <- dir("R/module-ROOT/",recursive = T)
-module_list <- module_list[grepl("/module-",module_list)]
+# Get things that have filenames that look like modules.
+# There is probably a more sensible way of doing this,
+# but this works.
+module_list <- module_list[grepl("module-[[:alnum:][:space:]_-]+.R",module_list,)]
 
-  # last-minute substitution of variables here.
+# last-minute substitution of variables here.
 write("Loading server module expressions:", stderr())
 module_server_expr <- sapply(module_list,\(f){
   
@@ -64,10 +49,6 @@ inputCollection <- function(input_names,input_index){
 }
 
 
-
-
-
-
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
   
@@ -76,10 +57,19 @@ server <- function(input, output, session) {
     stopApp()
   })
   
+  # Insert module server code
+  eval(module_server_expr)
+  
+  # Check for updates. This happens after modules (including settings) are loaded
+  # so we know if we should bypass this.
+  
+  # See module-SETTINGS.R for definition of SETTINGS__settings()
+  update_flagged <- check_update(software_version,isolate(SETTINGS__settings()))
+  heartbeat(software_version,isolate(SETTINGS__settings()))
+  
   observe({
     update_flagged
     
-    print(update_flagged)
     if(update_flagged$needed){
       showModal(modalDialog(
         title=sprintf("Update available: %s",update_flagged$new_tag),
@@ -92,15 +82,9 @@ server <- function(input, output, session) {
           target="_blank"
         )
         
-        
-        
       ))
     }
   })
-  
-  
-  # Insert module server code
-  eval(module_server_expr)
   
   output$software_version_display <- renderText(
     sprintf("v%s",paste(software_version,collapse="."))
