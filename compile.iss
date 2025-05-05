@@ -2,12 +2,13 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "COMPARE WINS"
-#define MyAppVersion "0.5.1"
+#define MyAppVersion "0.5.2"
 #define MyAppPublisher "Australian Stroke Alliance"
 #define MyAppURL "https://github.com/HannahJohns/compare-wins"
-#define MyAppExeName "run.bat"
 
+#define MyAppExeName "run-silent.vbs"
 [Setup]
+LicenseFile=terms.txt
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
 AppId={{B9480789-7F7A-4B7C-9B7E-5BF3520C5995}
@@ -22,10 +23,10 @@ DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
 ; Remove the following line to run in administrative install mode (install for all users.)
 PrivilegesRequired=lowest
-OutputDir=D:\repositories\clinician-gpc\releases
+OutputDir=releases
 OutputBaseFilename=CompareWins_setup
-Compression=lzma
-SolidCompression=yes
+Compression=zip
+SolidCompression=no
 WizardStyle=modern
 
 [Languages]
@@ -35,8 +36,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "D:\repositories\clinician-gpc\source\{#MyAppExeName}"; DestDir: "{app}"; Excludes: ".git*,.Rproj*,*.Rhistory,tests\*"; Flags: ignoreversion
-Source: "D:\repositories\clinician-gpc\source\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "source\{#MyAppExeName}"; DestDir: "{app}"; Excludes: ".git*,.Rproj*,*.Rhistory,tests\*"; Flags: ignoreversion
+Source: "source\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]

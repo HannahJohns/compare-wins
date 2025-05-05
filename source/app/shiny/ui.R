@@ -1,7 +1,5 @@
 
-library(shiny)
-library(shinyBS)
-library(DT)
+source("R/load_packages.R")
 
 source("R/constructor_functions.R")
 
