@@ -2303,35 +2303,20 @@ list(
 
         # Report of results template following Howard's approach
 
-        if(n_strata==0){
-          resultTemplate <- sprintf("Of 100 people, %0.2f will have a better outcome if they are treated with %s while %0.2f will have a better outcome if they are treated with %s. %0.2f will have equivalent outcomes under both treatments (%s%s = %0.2f, %2.0f%%CI %0.2f - %0.2f).%s",
-                                    100*results$estimate$win,
-                                    levels[1],
-                                    100* results$estimate$loss,
-                                    levels[2],
-                                    100* results$estimate$tie,
-                                    ifelse(length(covariates_effect)>0,"Adj. ",""),
-                                    results$estimate$outcome,
-                                    results$estimate$estimate,
-                                    100*(1-alpha),
-                                    results$estimate$lower,
-                                    results$estimate$upper,
-                                    ifelse(adjust.method!="unadjusted","This effect size is adjusted for censoring.","")
-          )
-
-        } else {
-
-          resultTemplate <- sprintf("%s%s = %0.2f, %2.0f%%CI %0.2f - %0.2f. %s",
-                                    ifelse(length(covariates_effect)>0,"Adj. ",""),
-                                    results$estimate$outcome,
-                                    results$estimate$estimate,
-                                    100*(1-alpha),
-                                    results$estimate$lower,
-                                    results$estimate$upper,
-                                    ifelse(adjust.method!="unadjusted","This effect size is adjusted for censoring.","")
-          )
-
-        }
+        resultTemplate <- sprintf("Of 100 people, %0.2f will have a better outcome if they are treated with %s while %0.2f will have a better outcome if they are treated with %s. %0.2f will have equivalent outcomes under both treatments (%s%s = %0.2f, %2.0f%%CI %0.2f - %0.2f).%s",
+                                  100*results$estimate$win,
+                                  levels[1],
+                                  100* results$estimate$loss,
+                                  levels[2],
+                                  100* results$estimate$tie,
+                                  ifelse(length(covariates_effect)>0,"Adj. ",""),
+                                  results$estimate$outcome,
+                                  results$estimate$estimate,
+                                  100*(1-alpha),
+                                  results$estimate$lower,
+                                  results$estimate$upper,
+                                  ifelse(adjust.method!="unadjusted"," This effect size is adjusted for censoring.","")
+        )
 
 
         out[[length(out)+1]] <- fluidRow(
