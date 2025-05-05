@@ -36,8 +36,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "source\{#MyAppExeName}"; DestDir: "{app}"; Excludes: ".git*,.Rproj*,*.Rhistory,tests\*"; Flags: ignoreversion
-Source: "source\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "source\{#MyAppExeName}"; DestDir: "{app}"; Excludes: ".git*,.Rproj*,*.Rhistory,tests\*"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "source\*"; DestDir: "{app}"; Excludes: "*\shiny\*.RDS,*\log-*.txt"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
