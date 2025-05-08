@@ -2,6 +2,10 @@
 # Set default CRAN mirror for if we need to install anything
 chooseCRANmirror(ind=1)
 
+cat("Library paths are:")
+print(.libPaths())
+cat("\n")
+
 source("R/load_packages.R")
 
 source("R/misc_functions.R")

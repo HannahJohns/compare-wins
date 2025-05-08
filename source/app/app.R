@@ -1,4 +1,5 @@
 
+.libPaths("dist/R-Portable/App/R-Portable/library/")
 
 cat("Library paths are:")
 print(.libPaths())
