@@ -157,6 +157,163 @@ heartbeat <- function(software_version,settings){
 # Infrastructure functions ##################################
 
 
+# Voting Functions #################################################
+
+
+
+#' Condorcet ranking 
+#'
+#' @description
+#' Synthesise rankings of alternatives using condorcet voting
+#' 
+#' @usage
+#' condorcet(x)
+#' 
+#' @param x A n by m matrix containing the rankings comparing m alternatives. Individual rankings are provided row-wise (i.e. there are n rankings to synthesise)
+#'  
+#' @return
+#' A data frame containing the following columns:
+#' \describe{
+#'   \item{alternative}{Name of alternatives used to compare. Taken from colnames(x)}
+#'   \item{condorset}{The subgraph returned by condorset voting}
+#'   \item{v1, v2, ...}{Subgraph valencies used to break ties in condorset subgraph}
+#'   \item{ranking}{The final ranking}
+#' }
+#'
+#' @details
+#' The returned data frame will return as many valency columns v1, v2... as were necessary to split ties
+#' resulting from condorcet ranking. The total number of such columns indicates how many iterations
+#' were needed to resolve ties in ranks. If each alternative occupies a unique condorcet sub-graph,
+#' then no valency columns will be returned. 
+#'
+#' @examples
+#' 
+#' ranks_df <- data.frame(
+#'   alt1 = c(4,2,2,1,5),
+#'   alt2 = c(3,3,5,5,2),
+#'   alt3 = c(6,6,6,2,1),
+#'   alt4 = c(5,1,4,3,6),
+#'   alt5 = c(1,4,3,6,3),
+#'   alt6 = c(2,5,1,4,4)
+#' )
+#' 
+#'
+#' @references
+#' Utley, Martin, et al. "A consensus process for identifying a prioritised list of study questions." Health care management science 10.1 (2007): 105-110.
+condorcet <- function(x){
+  x <- as.matrix(x)
+  
+  is.unique <- function(y){length(unique(y))==length(y)}
+  
+  # Get count of wins for each alternative
+  # If smaller rank, then it wins
+  winMat <- matrix(0,ncol(x),ncol(x))
+  for(i in 1:nrow(x)){
+    winMat <- winMat + 
+      (sign(outer(
+        unlist(x[i,]),
+        unlist(x[i,]),
+        "-"
+      ))<0)
+  }
+  
+  # Convert to preference graph
+  # P[i,j] = 0 if more losses for i than wins, otherwise 1
+  P <- sign(sign(winMat-t(winMat))+1)
+  diag(P) <- 0
+  
+  
+  # get C such that  C[i,j] is 1 if a path from i to j exists in the
+  # preference graph or 0 otherwise
+  
+  D <- C <- P
+  while(TRUE){
+    
+    C_old <- C
+    for(i in 1:nrow(P)){
+      for(j in 1:nrow(P)){
+        for(k in 1:nrow(P)){
+          if(i == j | i==k | k ==j){
+            
+          } else {
+            if(C[i,j] == 0 & C[i,k] == 1 & C[k,j] == 1){
+              D[i,j] <- 1
+            }
+          }
+          
+        } 
+      }
+    }
+    C <- D
+    
+    if(all(C==C_old)) break
+  }
+  
+  condorset <- apply(C,1,sum)
+  
+  # This is a very hacky way to run order() but allowing for ties
+  # There is almost certainly a better way to do this.
+  condorset <- as.numeric(factor(condorset))
+  names(condorset) <- rownames(P)
+  
+  out <- data.frame(
+    Option = rownames(P),
+    `Condorcet Score` = condorset
+  )
+  
+  ranking <- condorset
+  ranking <- as.numeric(as.factor(ranking))
+  names(ranking) <- rownames(P)
+  
+  # Resolve ties based on valency  
+  ranking_old <- ranking
+  n_valencies <- 0
+  while(!is.unique(ranking)){
+    
+    n_valencies <- n_valencies+1
+    
+    # Get valency i.e. number of edges eminating from a vertex
+    # leading to other vertices in the sub-graph
+    
+    valencies <- {}
+    for( i in unique(ranking)){
+      
+      if(sum(ranking == i)>1){
+        thisValency <- apply(P[ranking == i,ranking == i],1,sum)
+      } else {
+        thisValency <- ranking[ranking==i]
+        thisValency[1] <- 0
+      }
+      valencies <- c(valencies,thisValency)
+    }
+    valencies <- valencies[names(ranking)]
+    
+    out <- cbind(out,valencies)
+    colnames(out)[ncol(out)] <- paste0("v",n_valencies)
+    
+    # Update ranks with ties split using subgraph valencies
+    ranking <- ranking*length(unique(valencies))+valencies
+    ranking <- as.numeric(as.factor(ranking))
+    names(ranking) <- rownames(P)
+    
+    if(all(ranking==ranking_old)){
+      break
+    } else {
+      ranking_old <- ranking
+    }
+    
+  }
+  
+  # ranking up until this point has been worst is lowest, which is
+  # counterintuitive. Swap this around for final ranking.
+  
+  ranking <- max(ranking)-ranking+1
+  
+  cbind(Option=out[,"Option"],
+        Ranking=ranking,
+        out[,setdiff(colnames(out),"Option")])
+  
+}
 
 # Analysis Functions ##################################
 

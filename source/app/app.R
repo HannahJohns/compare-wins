@@ -14,3 +14,6 @@ if(!"shiny" %in% rownames(installed.packages())){
 }
 
 shiny::runApp('./app/shiny',launch.browser = TRUE)
+
+
+
