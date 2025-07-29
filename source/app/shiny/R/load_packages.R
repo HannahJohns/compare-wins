@@ -1,23 +1,23 @@
 
-.libPaths("dist/R-Portable/App/R-Portable/library/")
+#.libPaths("dist/R-Portable/App/R-Portable/library/")
 
 # Master list of packages to load/install
 package_list <- c(
   "MASS",
   "jsonlite",
   "curl",
-  
+
   "shiny",
   "shinyBS",
   "DT",
-  
+
   "simsalapar",
   "pim",
   "WINS",
-  
+
   "patchwork",
   "rankinPlot",
-  
+
   "rlang",
   "tidyverse",
   "httr",
@@ -41,7 +41,7 @@ package_list <- setdiff(package_list,already_loaded)
 to_install <- setdiff(package_list, rownames(installed.packages()) )
 
 if(length(to_install)>0){
-  
+
     # pb = winProgressBar(
     #   title = sprintf('Installing Packages'),
     #   label = 'Initializing ...'
@@ -51,18 +51,18 @@ if(length(to_install)>0){
       # setWinProgressBar(pb, i/(length(to_install)+1), label = sprintf('Installing package: %s', i))
       install.packages(i)
     }
-    
+
     # close(pb)
-    
+
 }
 
 if(length(package_list)>0){
-  
+
   for( i in package_list){
     eval(
       bquote(library(.(i)))
     )
   }
-  
+
 }
 
