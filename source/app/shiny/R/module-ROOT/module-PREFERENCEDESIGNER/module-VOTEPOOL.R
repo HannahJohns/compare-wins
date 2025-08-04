@@ -58,7 +58,6 @@ list(
 
       req(VOTEPOOL__data_sheet())
       data <- VOTEPOOL__data_sheet()
-      
 
       colTypes <- sapply(1:ncol(data),function(i){
         input[[sprintf(sprintf("VOTEPOOL__columnSelect_%d",i))]]
@@ -101,8 +100,13 @@ list(
       
       data <- data[,names(colTypes)[colTypes=="option"]]
       
-      data
+      # Check here that all columns are numeric
+      if(!all(apply(data,2,is.numeric))) stop("All votes should be numeric - check for letters and spaces in data sheet.")
       
+      # If we add other methods for synthesising votes, this this will be a case switch statement 
+      out <- condorcet(data)
+      
+      as.data.frame(out)
     })
     
     output$VOTEPOOL__tbl_results <- DT::renderDT({
@@ -110,13 +114,8 @@ list(
       req(VOTEPOOL__results())
       data <- VOTEPOOL__results()
       
-      # Check here that all columns are numeric
-      if(!all(apply(data,2,is.numeric))) stop("All votes should be numeric - check for letters and spaces in data sheet.")
+      data
       
-      # If we add other methods for synthesising votes, this this will be a case switch statement 
-      out <- condorcet(data)
-      
-      out
     })
     
   })

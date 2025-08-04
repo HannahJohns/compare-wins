@@ -315,7 +315,7 @@ condorcet <- function(x){
 
 
 source("R/global_functions/gpct.R")
-
+source("R/global_functions/door_generating_functions.R")
 
 # Analysis Functions ##################################
 

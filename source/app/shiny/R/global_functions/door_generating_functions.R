@@ -129,8 +129,6 @@ getDOORList <- function(df,direction){
 
   for(i_combn in 1:nrow(classCombnGrid)){
 
-    print(i_combn)
-
     # For this combination, get variable group ID
 
     thisCombnSet <- classCombnGrid[i_combn,]
@@ -181,7 +179,7 @@ getDOORList <- function(df,direction){
     combineMethod <- do.call("expand.grid",combineMethod)
 
 
-    var_combn_list[[i_combn]] <- pbapply::pblapply(1:nrow(combineMethod),function(i){
+    var_combn_list[[i_combn]] <- lapply(1:nrow(combineMethod),function(i){
       list(
         combine = groupMember,
         ordering = thesePerms[combineMethod$i_perm[i],],
