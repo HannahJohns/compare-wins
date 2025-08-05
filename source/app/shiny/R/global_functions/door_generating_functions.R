@@ -47,7 +47,8 @@ getDOORList <- function(df,direction){
 
         new_allocation <- allocation
         new_allocation[selected] <- block
-        #
+
+
         #     print(list(selected=selected,
         #                new_unselected=new_unselected
         #     ))

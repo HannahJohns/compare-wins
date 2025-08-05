@@ -42,7 +42,7 @@ list(
 
       data
     })
-    
+
     output$PROFILES__data_processing <- renderUI({
 
       req(PROFILES__data_sheet_profiles_raw())
@@ -79,7 +79,7 @@ list(
                  )
           )
         )
-        
+
       })
 
       do.call("tagList",out)
@@ -89,7 +89,6 @@ list(
 
       req(PROFILES__data_sheet_profiles_raw())
       data_raw <- PROFILES__data_sheet_profiles_raw()
-      
 
       # There are so many things that can go wrong here.
       # catch errors and report them when the results of this get called
@@ -131,12 +130,11 @@ list(
 
             } else if(thisClass == "logical"){
 
-            print("THIS NEEDS WRITTEN!")
+              thisCol[,1] <- as.logical(thisCol[,1])
 
             } else if(thisClass == "factor"){
 
               print("THIS NEEDS WRITTEN!")
-
 
             } else if(thisClass == "integer"){
 
@@ -215,222 +213,230 @@ list(
 
       data
     })
-    
-    
-    
 
-    
+
+
+
+
     output$PROFILES__link_ui <- renderUI({
-      
-      
+
+
       req(PROFILES__data_sheet_profiles_processed())
       data_profiles <- PROFILES__data_sheet_profiles_processed()
-      
+
       req(SYMBOLIC_LINK__ranks_processed())
       data_ranks <- SYMBOLIC_LINK__ranks_processed()
-      
-      
+
+
       tagList(
-        
+
         column(width=3,
           selectInput("PROFILES__link_id_profiles",
                       label = "Select column containing Profile ID from above",
-                      choices = colnames(data_profiles))          
+                      choices = colnames(data_profiles))
         ),
         column(width=3,
           selectInput("PROFILES__link_id_rank",
                       label = "Select column containing ranks from Consensus Voting tab",
-                      choices = colnames(data_ranks))       
+                      choices = colnames(data_ranks))
         )
       )
-      
-      
+
+
     })
-    
-    
-    
-    
+
+
     PROFILES_candidateMethods <- reactive({
 
       input$PROFILES__go
-      
+
       data_profiles <- isolate(PROFILES__data_sheet_profiles_processed())
-      
+
       data_raw <- isolate(PROFILES__data_sheet_profiles_raw())
       data_profiles_direction <- sapply(1:ncol(data_raw),function(i){
-        isolate(input[[sprintf("PROFILES__data_processing_%d_direction",i)]])        
+        isolate(input[[sprintf("PROFILES__data_processing_%d_direction",i)]])
       })
       names(data_profiles_direction) <- colnames(data_raw)
-      
+
       data_profiles_id_col <- isolate(input$PROFILES__link_id_profiles)
       data_ranks <- isolate(SYMBOLIC_LINK__ranks_processed())
       data_ranks_rank_col <- isolate(input$PROFILES__link_id_rank)
-      
+
+
+      saveRDS(list(
+        data_profiles=data_profiles,
+        data_raw=data_raw,
+        data_profiles_direction=data_profiles_direction,
+        data_profiles_id_col=data_profiles_id_col,
+        data_ranks=data_ranks,
+        data_ranks_rank_col=data_ranks_rank_col
+      ), file="TRACE_candidateMethods.RDS")
+
       out <- NULL
-      
+
       if(!is.null(data_profiles) & !is.null(data_ranks)){
-        
-        
+
+
         print(data_ranks)
-        
+
         # First, extract rank information.
-        
+
         profile_id <- unlist(data_profiles[,data_profiles_id_col])
-        
+
         # Ranks will have been checks when they were loaded into the sheet.
         profile_id <- make.names(profile_id)
         profile_ranks <- as.numeric(sapply(profile_id, function(i){
           i <<- i
           unlist(data_ranks[,data_ranks_rank_col])[data_ranks$Option==i]
         }))
-        
+
         print(profile_id)
         print(profile_ranks)
-        
-        
+
+
         direction <- data_profiles_direction[setdiff(colnames(data_profiles), data_profiles_id_col)]
-        
+
         direction
-        
+
         candidateDOORS <- getDOORList( data_profiles[,names(direction)], direction)
-        
+
         out <- lapply(1:length(candidateDOORS), function(i){NULL})
-        
+
         startTime <- Sys.time()
         total_run <- length(out)
-        
+
         withProgress(message="Evaluating Candidate DOOR",{
           for(i in 1:length(out)){
-            
+
             currTime <- Sys.time()
-            
+
             elapsedTime <- as.numeric(difftime(currTime,startTime, units = "mins"))
-            remainingTime <- elapsedTime * (total_run/(i) - 1 )   
+            remainingTime <- elapsedTime * (total_run/(i) - 1 )
             unitsTime <- "minutes"
-            
+
             if(remainingTime > 60){
               remainingTime <- remainingTime/60
               unitsTime <- "hours"
             }
-            
+
             detail <- sprintf("%d/%d %0.2f %s remaining",
                               i,
                               total_run,
                               remainingTime,
                               "mins"
             )
-            
+
             incProgress(1/total_run,detail= detail)
-            
+
             x <- candidateDOORS[[i]]
-            
+
             transformed_df <- build_transformed_df(x,data_profiles[,names(direction)])
-            
+
             K <- construct_K(x,transformed_df)
-            
+
             out[[i]] <- list(DOOR=x,eval = gpct(K,profile_ranks))
-            
+
           }
         })
-        
+
         # Get the best candidates at the front
         out <- out[order(-sapply(out, function(x){x$eval[1]}))]
-        
+
         out
-      
+
       }
     })
-    
-    
+
+
     output$PROFILES__door_select_ui <- renderUI({
-      
+
       req(PROFILES_candidateMethods())
       candidates <- PROFILES_candidateMethods()
-      
+
       fluidRow(column(width=3, numericInput("PROFILES__door_select",label = "Display Candidate DOOR",value = 1,min = 1, max=length(candidates))))
     })
-    
-    
-    
+
+
+
     output$PROFILES__door_selected <- DT::renderDataTable({
-      
-      
+
+
       req(PROFILES_candidateMethods())
       candidates <- PROFILES_candidateMethods()
-      
+
       # which(sapply(candidates, function(x){
       #   length(x$DOOR$ordering)
-      # }) ==5)      
-      # 
+      # }) ==5)
+      #
       # thisCandidate <- candidates[[55]]
-      # 
-      # 
+      #
+      #
       # i <- names(sort(thisCandidate$DOOR$ordering))[1]
-      # 
-      # 
-      # 
+      #
+      #
+      #
       # lapply(names(sort(thisCandidate$DOOR$ordering)), function(i){
-      #   
+      #
       #   theseVars <- names(
       #     thisCandidate$DOOR$combine[thisCandidate$DOOR$combine == i]
       #   )
-      #   
+      #
       #   if(grepl("Surv",i)){
       #     combineMethod  <- "First event out of"
       #   } else if(grepl("Surv",i)){
-      #     
-      #     
-      #     
+      #
+      #
+      #
       #   } else {
       #     ""
       #   }
-      #   
-      #     
+      #
+      #
       #   data.frame(
       #     variables = paste(
       #       ,
       #       collapse = ", "
       #     )
       #   )
-      #   
+      #
       # })
-      
-     as.data.frame(diag(3)) 
+
+     as.data.frame(diag(3))
     })
 
-    
-    
+
+
     output$PROFILES__results  <- renderPlot({
-      
+
       req(PROFILES_candidateMethods())
       candidates <- PROFILES_candidateMethods()
-      
+
       saveRDS(candidates,
               file="TRACE.RDS")
-      
+
       # candidates <- readRDS("source/app/shiny/TRACE.RDS")
-      
+
       tmp <- as.data.frame(do.call("rbind",lapply(candidates, function(x){x$eval})))
       tmp$step <- 1:nrow(tmp)
       tmp$lower = tmp$effect - tmp$se * qnorm(p = 1-0.025)
       tmp$upper = tmp$effect + tmp$se * qnorm(p = 1-0.025)
-      
+
       tmp$effect <- exp(tmp$effect)
       tmp$lower <- exp(tmp$lower)
       tmp$upper <- exp(tmp$upper)
-      
-      
+
+
       ggplot2::ggplot(tmp,ggplot2::aes(x=step,y=effect,ymin=lower,ymax=upper)) +
         ggplot2::geom_ribbon(alpha=0.6)+
         ggplot2::geom_line()+
         ggplot2::theme_bw()+
         ggplot2::labs(x="Candidate DOOR",y="Agreement")+
         ggplot2::scale_y_log10()
-      
+
     })
-    
-    
-    
+
+
+
     # output$PROFILES__columnSelect <- renderUI({
     #
     #   req(PROFILES__data_sheet())
