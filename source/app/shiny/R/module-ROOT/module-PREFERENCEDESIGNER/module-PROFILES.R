@@ -18,7 +18,10 @@ list(
                column(width=2,actionButton("PROFILES__go",label = "Go!"))
                ),
       fluidRow(uiOutput("PROFILES__door_select_ui")),
-      plotOutput("PROFILES__results")
+      fluidRow(
+        column(width=6, DT::dataTableOutput("PROFILES__door_selected")),
+        column(width=6, plotOutput("PROFILES__results"))
+      )
     )
   ),
   server_element = substitute({
@@ -364,53 +367,66 @@ list(
       req(PROFILES_candidateMethods())
       candidates <- PROFILES_candidateMethods()
 
-      # which(sapply(candidates, function(x){
-      #   length(x$DOOR$ordering)
-      # }) ==5)
-      #
-      # thisCandidate <- candidates[[55]]
-      #
-      #
-      # i <- names(sort(thisCandidate$DOOR$ordering))[1]
-      #
-      #
-      #
-      # lapply(names(sort(thisCandidate$DOOR$ordering)), function(i){
-      #
-      #   theseVars <- names(
-      #     thisCandidate$DOOR$combine[thisCandidate$DOOR$combine == i]
-      #   )
-      #
-      #   if(grepl("Surv",i)){
-      #     combineMethod  <- "First event out of"
-      #   } else if(grepl("Surv",i)){
-      #
-      #
-      #
-      #   } else {
-      #     ""
-      #   }
-      #
-      #
-      #   data.frame(
-      #     variables = paste(
-      #       ,
-      #       collapse = ", "
-      #     )
-      #   )
-      #
-      # })
+      min(sapply(candidates, function(x){
+        length(x$DOOR$ordering)
+      }))
+      which(sapply(candidates, function(x){
+        length(x$DOOR$ordering)
+      }) ==3)
+      
+      
+      thisCandidate <- candidates[[input$PROFILES__door_select]]
+      
+      door_table <- lapply(names(sort(thisCandidate$DOOR$ordering)), function(i){
 
-     as.data.frame(diag(3))
+        theseVars <- names(
+          thisCandidate$DOOR$combine[thisCandidate$DOOR$combine == i]
+        )
+        
+        combineMethod  <- ""
+        if(grepl("Surv",i)){
+          combineMethod  <- "First event out of"
+        } else if(grepl("logical",i)){
+          combineMethod  <- switch(as.character(thisCandidate$DOOR$combineMethod[i]),
+                                   sum = sprintf("Count of the following (0 to %d)",length(theseVars)),
+                                   any = "Any of the following (yes/no)"
+                                  )
+        } 
+
+        data.frame(
+          combineMethod = combineMethod,
+          variables = paste(
+            theseVars,
+            collapse = ", "
+          )
+        )
+
+      })
+      
+      door_table <- do.call("rbind",door_table)
+
+      door_table <- cbind(Rank = 1:nrow(door_table),door_table)
+      
+      DT::datatable(door_table, options = list(dom = ''),
+                    caption = sprintf("DOOR Candidate %d. GPCT Trend Odds %0.4f (95%% CI %0.4f- %0.4f)",
+                                      input$PROFILES__door_select,
+                                      exp(thisCandidate$eval["effect"]),
+                                      exp(thisCandidate$eval["effect"]-qnorm(1-0.05/2)*thisCandidate$eval["se"]),
+                                      exp(thisCandidate$eval["effect"]+qnorm(1-0.05/2)*thisCandidate$eval["se"])
+                    ),
+                    rownames= FALSE
+                    )
+      
     })
-
 
 
     output$PROFILES__results  <- renderPlot({
 
       req(PROFILES_candidateMethods())
       candidates <- PROFILES_candidateMethods()
-
+      
+      xintercept <- input$PROFILES__door_select
+      
       saveRDS(candidates,
               file="TRACE.RDS")
 
@@ -429,13 +445,12 @@ list(
       ggplot2::ggplot(tmp,ggplot2::aes(x=step,y=effect,ymin=lower,ymax=upper)) +
         ggplot2::geom_ribbon(alpha=0.6)+
         ggplot2::geom_line()+
+        ggplot2::geom_vline(xintercept = xintercept, color="dark red")+
         ggplot2::theme_bw()+
         ggplot2::labs(x="Candidate DOOR",y="Agreement")+
         ggplot2::scale_y_log10()
 
     })
-
-
 
     # output$PROFILES__columnSelect <- renderUI({
     #
