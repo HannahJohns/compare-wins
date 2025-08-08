@@ -14,8 +14,7 @@ list(
         tabPanel("Processed Data",DT::dataTableOutput("PROFILES__tbl_profiles_processed"))
       ),
       fluidRow(tags$hr(),
-               uiOutput("PROFILES__link_ui"),
-               column(width=2,actionButton("PROFILES__go",label = "Go!"))
+               uiOutput("PROFILES__link_ui")
                ),
       fluidRow(uiOutput("PROFILES__door_select_ui")),
       fluidRow(
@@ -230,6 +229,9 @@ list(
       req(SYMBOLIC_LINK__ranks_processed())
       data_ranks <- SYMBOLIC_LINK__ranks_processed()
 
+      numeric_castable <- sapply(1:ncol(data_ranks), function(i){all(!is.na(suppressWarnings(as.numeric(data_ranks[,i]))))})
+
+      if(sum(numeric_castable)==0) stop("Need at least one numeric column in votes")
 
       tagList(
 
@@ -241,8 +243,10 @@ list(
         column(width=3,
           selectInput("PROFILES__link_id_rank",
                       label = "Select column containing ranks from Consensus Voting tab",
-                      choices = colnames(data_ranks))
-        )
+                      choices = colnames(data_ranks)[numeric_castable]
+                      )
+        ),
+        column(width=2,actionButton("PROFILES__go",label = "Go!"))
       )
 
 
@@ -266,14 +270,18 @@ list(
       data_ranks_rank_col <- isolate(input$PROFILES__link_id_rank)
 
 
-      saveRDS(list(
-        data_profiles=data_profiles,
-        data_raw=data_raw,
-        data_profiles_direction=data_profiles_direction,
-        data_profiles_id_col=data_profiles_id_col,
-        data_ranks=data_ranks,
-        data_ranks_rank_col=data_ranks_rank_col
-      ), file="TRACE_candidateMethods.RDS")
+      # saveRDS(list(
+      #   data_profiles=data_profiles,
+      #   data_raw=data_raw,
+      #   data_profiles_direction=data_profiles_direction,
+      #   data_profiles_id_col=data_profiles_id_col,
+      #   data_ranks=data_ranks,
+      #   data_ranks_rank_col=data_ranks_rank_col
+      # ), file="TRACE_candidateMethods.RDS")
+
+      # tmp <- readRDS("source/app/shiny/TRACE_candidateMethods.RDS")
+      # attach(tmp)
+
 
       out <- NULL
 
@@ -290,7 +298,7 @@ list(
         profile_id <- make.names(profile_id)
         profile_ranks <- as.numeric(sapply(profile_id, function(i){
           i <<- i
-          unlist(data_ranks[,data_ranks_rank_col])[data_ranks$Option==i]
+          thisRank <- unlist(data_ranks[,data_ranks_rank_col])[data_ranks$Option==i]
         }))
 
         print(profile_id)
@@ -373,16 +381,16 @@ list(
       which(sapply(candidates, function(x){
         length(x$DOOR$ordering)
       }) ==3)
-      
-      
+
+
       thisCandidate <- candidates[[input$PROFILES__door_select]]
-      
+
       door_table <- lapply(names(sort(thisCandidate$DOOR$ordering)), function(i){
 
         theseVars <- names(
           thisCandidate$DOOR$combine[thisCandidate$DOOR$combine == i]
         )
-        
+
         combineMethod  <- ""
         if(grepl("Surv",i)){
           combineMethod  <- "First event out of"
@@ -391,7 +399,7 @@ list(
                                    sum = sprintf("Count of the following (0 to %d)",length(theseVars)),
                                    any = "Any of the following (yes/no)"
                                   )
-        } 
+        }
 
         data.frame(
           combineMethod = combineMethod,
@@ -402,11 +410,11 @@ list(
         )
 
       })
-      
+
       door_table <- do.call("rbind",door_table)
 
       door_table <- cbind(Rank = 1:nrow(door_table),door_table)
-      
+
       DT::datatable(door_table, options = list(dom = ''),
                     caption = sprintf("DOOR Candidate %d. GPCT Trend Odds %0.4f (95%% CI %0.4f- %0.4f)",
                                       input$PROFILES__door_select,
@@ -416,7 +424,7 @@ list(
                     ),
                     rownames= FALSE
                     )
-      
+
     })
 
 
@@ -424,11 +432,11 @@ list(
 
       req(PROFILES_candidateMethods())
       candidates <- PROFILES_candidateMethods()
-      
+
       xintercept <- input$PROFILES__door_select
-      
-      saveRDS(candidates,
-              file="TRACE.RDS")
+
+      # saveRDS(candidates,
+      #         file="TRACE.RDS")
 
       # candidates <- readRDS("source/app/shiny/TRACE.RDS")
 
