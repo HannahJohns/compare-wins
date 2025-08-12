@@ -148,7 +148,6 @@ getDOORList <- function(df,direction){
     # If the number of groups to rank is above some threshold number, stop here
     # and move to the next way of combining things
     uniqueGroups <- unique(groupMember)
-    print(length(uniqueGroups))
 
     if(length(uniqueGroups)>10) next
 

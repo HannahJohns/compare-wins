@@ -18,8 +18,8 @@ list(
                ),
       fluidRow(uiOutput("PROFILES__door_select_ui")),
       fluidRow(
-        column(width=6, DT::dataTableOutput("PROFILES__door_selected")),
-        column(width=6, plotOutput("PROFILES__results"))
+       column(width=6, DT::dataTableOutput("PROFILES__door_selected")),
+       column(width=6, plotOutput("PROFILES__results"))
       )
     )
   ),
@@ -53,14 +53,41 @@ list(
       # At minimum, we need to get a list of each column type
       # if survival, give dropdown for censoring column
 
+      numeric_castable <- sapply(1:ncol(data_raw), function(i){all(!is.na(suppressWarnings(as.numeric(data_raw[,i]))))})
+      print(numeric_castable)
+
       out <- lapply(1:ncol(data_raw),function(i){
+
+        thisClass <- class(data_raw[,i])
+
+        if(numeric_castable[i]){
+          if(all(as.numeric(data_raw[,i]) %in% c(0,1))){
+            thisClass <- "logical"
+          } else {
+            thisClass <- "numeric"
+          }
+        }
+
+        thisClass <- switch(thisClass,
+                            character = "character",
+                            logical = "logical",
+                            factor = "character",
+                            integer = "numeric",
+                            numeric = "numeric",
+                            survival = "survival",
+                            ignore = "ignore"
+                            )
 
         fluidRow(
           column(width=3,
                  selectInput(sprintf("PROFILES__data_processing_%d",i),
                               label = colnames(data_raw)[i],
-                              choices = c("character","logical","factor","integer","numeric","survival","ignore"),
-                              selected = class(data_raw[,i])
+                              choices = c("Character"="character",
+                                          "Binary" = "logical",
+                                          "Number" = "numeric",
+                                          "Survival" = "survival",
+                                          "Drop" = "ignore"),
+                              selected = thisClass
           )
           ),
           column(width=3,
@@ -257,6 +284,13 @@ list(
 
       input$PROFILES__go
 
+      if(length(input$PROFILES__go) == 0) return(NULL)
+      if(input$PROFILES__go == 0) return(NULL)
+
+      withProgress(message="Initialising",{
+
+      print(isolate(input$PROFILES__go))
+
       data_profiles <- isolate(PROFILES__data_sheet_profiles_processed())
 
       data_raw <- isolate(PROFILES__data_sheet_profiles_raw())
@@ -269,26 +303,24 @@ list(
       data_ranks <- isolate(SYMBOLIC_LINK__ranks_processed())
       data_ranks_rank_col <- isolate(input$PROFILES__link_id_rank)
 
+      })
 
-      # saveRDS(list(
-      #   data_profiles=data_profiles,
-      #   data_raw=data_raw,
-      #   data_profiles_direction=data_profiles_direction,
-      #   data_profiles_id_col=data_profiles_id_col,
-      #   data_ranks=data_ranks,
-      #   data_ranks_rank_col=data_ranks_rank_col
-      # ), file="TRACE_candidateMethods.RDS")
+
+# saveRDS(list(
+#   data_profiles=data_profiles,
+#   data_raw=data_raw,
+#   data_profiles_direction=data_profiles_direction,
+#   data_profiles_id_col=data_profiles_id_col,
+#   data_ranks=data_ranks,
+#   data_ranks_rank_col=data_ranks_rank_col
+# ), file="TRACE_candidateMethods.RDS")
 
       # tmp <- readRDS("source/app/shiny/TRACE_candidateMethods.RDS")
-      # attach(tmp)
-
+      # # attach(tmp)
 
       out <- NULL
 
       if(!is.null(data_profiles) & !is.null(data_ranks)){
-
-
-        print(data_ranks)
 
         # First, extract rank information.
 
@@ -309,7 +341,9 @@ list(
 
         direction
 
-        candidateDOORS <- getDOORList( data_profiles[,names(direction)], direction)
+        withProgress(message="Generating Candidate DOORs",{
+          candidateDOORS <- getDOORList( data_profiles[,names(direction)], direction)
+        })
 
         out <- lapply(1:length(candidateDOORS), function(i){NULL})
 
@@ -328,13 +362,16 @@ list(
             if(remainingTime > 60){
               remainingTime <- remainingTime/60
               unitsTime <- "hours"
+            } else if(remainingTime < 1){
+              remainingTime <- remainingTime*60
+              unitsTime <- "seconds"
             }
 
             detail <- sprintf("%d/%d %0.2f %s remaining",
                               i,
                               total_run,
                               remainingTime,
-                              "mins"
+                              unitsTime
             )
 
             incProgress(1/total_run,detail= detail)
@@ -364,24 +401,20 @@ list(
       req(PROFILES_candidateMethods())
       candidates <- PROFILES_candidateMethods()
 
-      fluidRow(column(width=3, numericInput("PROFILES__door_select",label = "Display Candidate DOOR",value = 1,min = 1, max=length(candidates))))
-    })
 
+      fluidRow(column(width=3, numericInput("PROFILES__door_select",label = "Display Candidate DOOR",value = 1,min = 1, max=length(candidates))))
+
+    })
 
 
     output$PROFILES__door_selected <- DT::renderDataTable({
 
-
       req(PROFILES_candidateMethods())
+      req(input$PROFILES__door_select)
+
       candidates <- PROFILES_candidateMethods()
 
-      min(sapply(candidates, function(x){
-        length(x$DOOR$ordering)
-      }))
-      which(sapply(candidates, function(x){
-        length(x$DOOR$ordering)
-      }) ==3)
-
+      if(length(candidates)==0) return(NULL)
 
       thisCandidate <- candidates[[input$PROFILES__door_select]]
 
@@ -410,6 +443,7 @@ list(
         )
 
       })
+
 
       door_table <- do.call("rbind",door_table)
 
