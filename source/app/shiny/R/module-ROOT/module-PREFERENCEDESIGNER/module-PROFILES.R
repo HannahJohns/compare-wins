@@ -161,18 +161,9 @@ list(
 
               thisCol[,1] <- as.logical(thisCol[,1])
 
-            } else if(thisClass == "factor"){
-
-              print("THIS NEEDS WRITTEN!")
-
-            } else if(thisClass == "integer"){
-
-              print("THIS NEEDS WRITTEN!")
-
             } else if(thisClass == "numeric"){
 
-              print("THIS NEEDS WRITTEN!")
-
+              thisCol[,1] <- as.numeric( thisCol[,1] )
 
             } else if(thisClass == "survival"){
 
@@ -211,16 +202,24 @@ list(
 
       req(PROFILES__data_sheet_profiles_processed())
       data <- PROFILES__data_sheet_profiles_processed()
-
+      
       if("error" %in% class(data)) stop(data$message)
 
       # Rendering survival data is breaking things.
-      # To fix, just cheat and render it as a factor before rendering
+      # To fix, just cheat and render it as a factor before rendering.
+      # Factor lets us maintain ability to sort based on e.g. age
       # This is very stupid
 
       survVars <- colnames(data)[
         sapply(1:ncol(data),function(i){
           "Surv" %in% class(data[,i])
+        })
+      ]
+      
+      # Mark character columns with an asterist
+      charVars <- colnames(data)[
+        sapply(1:ncol(data),function(i){
+          "character" %in% class(data[,i])
         })
       ]
 
@@ -237,8 +236,9 @@ list(
         )
 
         data[,i] <- thisVar
-
       }
+      
+      colnames(data)[colnames(data) %in% charVars] <- sprintf("(*)%s", colnames(data)[colnames(data) %in% charVars])
 
       data
     })
@@ -306,6 +306,7 @@ list(
       })
 
 
+    
 # saveRDS(list(
 #   data_profiles=data_profiles,
 #   data_raw=data_raw,
@@ -333,13 +334,17 @@ list(
           thisRank <- unlist(data_ranks[,data_ranks_rank_col])[data_ranks$Option==i]
         }))
 
-        print(profile_id)
-        print(profile_ranks)
+        # print(profile_id)
+        # print(profile_ranks)
 
 
+        # Rank information is extracted, so we can remove the ID column
         direction <- data_profiles_direction[setdiff(colnames(data_profiles), data_profiles_id_col)]
-
-        direction
+        
+        # Remove any columns coded as character - we can't run using these.
+        direction <- direction[
+          sapply(names(direction), function(i){class(data_profiles[,i]) != "character"})
+        ]
 
         withProgress(message="Generating Candidate DOORs",{
           candidateDOORS <- getDOORList( data_profiles[,names(direction)], direction)
