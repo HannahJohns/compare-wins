@@ -132,7 +132,7 @@ getDOORList <- function(df,direction){
 
     # For this combination, get variable group ID
 
-    thisCombnSet <- classCombnGrid[i_combn,]
+    thisCombnSet <- classCombnGrid[i_combn,, drop=F]
 
     groupMember <- rep(NA,ncol(df))
     names(groupMember) <- colnames(df)

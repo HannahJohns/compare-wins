@@ -11,7 +11,9 @@ list(
       tabsetPanel(
         tabPanel("Raw data",DT::dataTableOutput("PROFILES__tbl_profiles_raw")),
         tabPanel("Data Processing",uiOutput("PROFILES__data_processing")),
-        tabPanel("Processed Data",DT::dataTableOutput("PROFILES__tbl_profiles_processed"))
+        tabPanel("Processed Data",
+                 DT::dataTableOutput("PROFILES__tbl_profiles_processed")
+                 )
       ),
       fluidRow(tags$hr(),
                uiOutput("PROFILES__link_ui")
@@ -54,7 +56,6 @@ list(
       # if survival, give dropdown for censoring column
 
       numeric_castable <- sapply(1:ncol(data_raw), function(i){all(!is.na(suppressWarnings(as.numeric(data_raw[,i]))))})
-      print(numeric_castable)
 
       out <- lapply(1:ncol(data_raw),function(i){
 
@@ -241,6 +242,16 @@ list(
       colnames(data)[colnames(data) %in% charVars] <- sprintf("(*)%s", colnames(data)[colnames(data) %in% charVars])
 
       data
+      
+      DT::datatable(mtcars,)
+      
+      DT::datatable(data,
+                    # options = list(dom = ''),
+                    caption =  "Variables marked with (*) will not be used to construct DOORs" 
+      )
+      
+     
+      
     })
 
 
@@ -269,7 +280,7 @@ list(
         ),
         column(width=3,
           selectInput("PROFILES__link_id_rank",
-                      label = "Select column containing ranks from Consensus Voting tab",
+                      label = "Select column containing ranks from Consensus Voting tab (Ranks are 1=best to worst)",
                       choices = colnames(data_ranks)[numeric_castable]
                       )
         ),
@@ -281,6 +292,7 @@ list(
 
 
     PROFILES_candidateMethods <- reactive({
+      
 
       input$PROFILES__go
 
@@ -299,25 +311,27 @@ list(
       })
       names(data_profiles_direction) <- colnames(data_raw)
 
+   
+      
       data_profiles_id_col <- isolate(input$PROFILES__link_id_profiles)
       data_ranks <- isolate(SYMBOLIC_LINK__ranks_processed())
       data_ranks_rank_col <- isolate(input$PROFILES__link_id_rank)
-
+      
       })
 
 
     
-# saveRDS(list(
-#   data_profiles=data_profiles,
-#   data_raw=data_raw,
-#   data_profiles_direction=data_profiles_direction,
-#   data_profiles_id_col=data_profiles_id_col,
-#   data_ranks=data_ranks,
-#   data_ranks_rank_col=data_ranks_rank_col
-# ), file="TRACE_candidateMethods.RDS")
+    # saveRDS(list(
+    #   data_profiles=data_profiles,
+    #   data_raw=data_raw,
+    #   data_profiles_direction=data_profiles_direction,
+    #   data_profiles_id_col=data_profiles_id_col,
+    #   data_ranks=data_ranks,
+    #   data_ranks_rank_col=data_ranks_rank_col
+    # ), file="TRACE_candidateMethods.RDS")
 
       # tmp <- readRDS("source/app/shiny/TRACE_candidateMethods.RDS")
-      # # attach(tmp)
+      # attach(tmp)
 
       out <- NULL
 
@@ -387,7 +401,8 @@ list(
 
             K <- construct_K(x,transformed_df)
 
-            out[[i]] <- list(DOOR=x,eval = gpct(K,profile_ranks))
+            # A higher rank corresponds to better outcome - swap this around
+            out[[i]] <- list(DOOR=x,eval = gpct(K, -profile_ranks))
 
           }
         })
