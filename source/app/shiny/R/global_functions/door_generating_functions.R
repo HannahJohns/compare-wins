@@ -151,8 +151,6 @@ getDOORList <- function(df,direction){
 
     if(length(uniqueGroups)>10) next
 
-
-
     # Then run perm(max(id)) to get all possible ways of ordering these
     thesePerms <- permutations(length(uniqueGroups))
     colnames(thesePerms) <- uniqueGroups

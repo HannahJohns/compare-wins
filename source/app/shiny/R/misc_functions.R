@@ -287,7 +287,7 @@ condorcet <- function(x){
     valencies <- valencies[names(ranking)]
 
     out <- cbind(out,valencies)
-    colnames(out)[ncol(out)] <- paste0("v",n_valencies)
+    colnames(out)[ncol(out)] <- paste0("valency.",n_valencies)
 
     # Update ranks with ties split using subgraph valencies
     ranking <- ranking*length(unique(valencies))+valencies
@@ -309,10 +309,10 @@ condorcet <- function(x){
 
   cbind(Option=out[,"Option"],
         Ranking=ranking,
-        out[,setdiff(colnames(out),"Option")])
-
+        out[,setdiff(colnames(out),"Option"),drop=F])
+  
+  
 }
-
 
 source("R/global_functions/gpct.R")
 source("R/global_functions/door_generating_functions.R")
