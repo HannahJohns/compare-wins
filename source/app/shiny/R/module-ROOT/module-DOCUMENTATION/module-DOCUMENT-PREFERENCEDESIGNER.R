@@ -78,6 +78,44 @@ list(
                tabPanel(title="Profile Explorer",
                         absolutePanel(style="overflow: auto;", height="500px",width="100%",
                                       tags$h3("Overview"),
+                        "The Profile Explorer tab makes it possible to identify which method for combining health facets
+                        best reflects clinical reality in a more holistic fashion. It achieves this by taking a list of
+                        hypothetical 'patient profiles', each of which have an outcome measured across each health facet.
+                        It then takes a ranking of these profiles provided by the Vote Synthesiser, and identifies what
+                        method for combining these health facets best matches the provided ranking.
+                        ",
+                        tags$h3("How to use this tool"),
+                        tags$ol(
+                          tags$li("Load a CSV file contianing patient profiles into the Profile Explorer. This CSV file should contain
+                                  a column uniquely identifying each profile (profile ID) and then any outcome information
+                                  "),
+                          tags$li("Format the data using the Data Processing tab within the Profile Explorer.
+                                  Select 'Drop' to remove any columns that should not be included in the analysis.
+                                  The profile ID and all columns of 'character' type will be dropped from analysis,
+                                  but all other variables will be included unless otherwise specified. This means
+                                  that if you are working with survival data, you should drop the
+                                  column containing the censoring status unless you want to include 
+                                  censoring status as a separate variable in addition to the time to event.
+                                  For each variable, select if a higher value is better or if a lower value is better.
+                                  For binary variables, 'higher' indicates presence of the outcome is beneficial and 'lower'
+                                  indicates the presence of the outcome is harmful."
+                                  ),
+                          tags$li("Confirm that the formatted patient profiles look correct in the Processed Data Tab"),
+                          tags$li("Navigate to the Vote Synthesiser tab and use it to rank these profiles from best (1) to worst.
+                                   Each alternative being ranked should match a profile ID.
+                                   If the ranking for these profiles already exists, this ranking can be provided
+                                   as a single row to the Vote Synthesiser.
+                                  "),
+                          tags$li("Navigate back to the to the Profile Explorer. Select the name of the column containing the profile IDS. Click 'Go!'
+                                  "),
+                          tags$li("Wait for the progress bar to complete. This may take some time.
+                                  "),
+                          tags$li("A list of candidate methods will appear at the bottom of the page, ordered from best fitting to worst fitting.
+                                   You can cycle through these using the 'Display Candidate Number' field.
+                                  ")
+                        )
+                        
+                        
                                       
                         )
                )

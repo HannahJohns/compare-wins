@@ -247,7 +247,7 @@ list(
       
       DT::datatable(data,
                     # options = list(dom = ''),
-                    caption =  "Variables marked with (*) will not be used to construct DOORs" 
+                    caption =  "Variables marked with (*) will not be used to construct candidates" 
       )
       
      
@@ -360,7 +360,7 @@ list(
           sapply(names(direction), function(i){class(data_profiles[,i]) != "character"})
         ]
 
-        withProgress(message="Generating Candidate DOORs",{
+        withProgress(message="Generating Candidates",{
           candidateDOORS <- getDOORList( data_profiles[,names(direction)], direction)
         })
 
@@ -369,7 +369,7 @@ list(
         startTime <- Sys.time()
         total_run <- length(out)
 
-        withProgress(message="Evaluating Candidate DOOR",{
+        withProgress(message="Evaluating Candidates",{
           for(i in 1:length(out)){
 
             currTime <- Sys.time()
@@ -422,7 +422,7 @@ list(
       candidates <- PROFILES_candidateMethods()
 
 
-      fluidRow(column(width=3, numericInput("PROFILES__door_select",label = "Display Candidate DOOR",value = 1,min = 1, max=length(candidates))))
+      fluidRow(column(width=3, numericInput("PROFILES__door_select",label = "Display Candidate Number",value = 1,min = 1, max=length(candidates))))
 
     })
 
@@ -470,7 +470,7 @@ list(
       door_table <- cbind(Rank = 1:nrow(door_table),door_table)
 
       DT::datatable(door_table, options = list(dom = ''),
-                    caption = sprintf("DOOR Candidate %d. GPCT Trend Odds %0.4f (95%% CI %0.4f- %0.4f)",
+                    caption = sprintf("Candidate %d. GPCT Trend Odds %0.4f (95%% CI %0.4f- %0.4f)",
                                       input$PROFILES__door_select,
                                       exp(thisCandidate$eval["effect"]),
                                       exp(thisCandidate$eval["effect"]-qnorm(1-0.05/2)*thisCandidate$eval["se"]),
@@ -509,7 +509,7 @@ list(
         ggplot2::geom_line()+
         ggplot2::geom_vline(xintercept = xintercept, color="dark red")+
         ggplot2::theme_bw()+
-        ggplot2::labs(x="Candidate DOOR",y="Agreement")+
+        ggplot2::labs(x="Candidate Number",y="Agreement")+
         ggplot2::scale_y_log10()
 
     })
